@@ -70,6 +70,12 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 - **RTC:** DS3231 on ZS-042 module (I2C)
 - **Battery:** CR2032 coin cell for RTC backup
 
+### ZS-042 module modification
+
+The ZS-042 module includes a charging circuit (resistor + diode) designed for rechargeable LIR2032 batteries. Since this project uses a non-rechargeable CR2032, the resistor in series with the diode leading to the battery must be removed to disable the charging circuit and prevent damage to the coin cell.
+
+Additionally, a wire has been soldered to the positive terminal of the battery holder and connected to pin A3 (via a 100k ohm resistor) to allow the Arduino to monitor the CR2032 voltage.
+
 ## Third-Party Documentation
 
 The file `futaba_m202s.pdf` is the original datasheet for the Futaba M202SD16FA display, included for reference only. All rights belong to Futaba Corporation. It is not covered by the project license and is redistributed here solely for the convenience of builders replicating this project.
