@@ -533,15 +533,18 @@ void syncRTC() {
 
 // ── Start clock ──────────────────────────────────────────────────────────────
 
-void startClock(int h, int m) {
+void startClock(int h, int m, int sec = 0) {
   hh = h;  mm = m;
   last_h1 = last_h2 = last_m1 = last_m2 = -1;
   colonPhase = 0;
-  colonCycle = 0;
+  // Skip cycles already elapsed within the current minute
+  unsigned long elapsedMs = (unsigned long)sec * 1000UL;
+  colonCycle = elapsedMs / 4000UL;
   clockRunning = true;
   colOffset = (mm % 8) - 3;
   redrawAll();
-  lastColon = millis();
+  // Backdate timer by the remainder so the next cycle fires at the right time
+  lastColon = millis() - (elapsedMs % 4000UL);
 }
 
 // ── Advance clock by N minutes ────────────────────────────────────────────────
@@ -658,7 +661,7 @@ void handleSetCommand() {
     Serial.print(':');
     if (utcOut.minute()<10) Serial.print('0'); Serial.println(utcOut.minute());
   }
-  startClock(hr, mi);
+  startClock(hr, mi, se);
   Serial.print(F("OK local "));
   if (dy<10) Serial.print('0'); Serial.print(dy);
   Serial.print('/');
@@ -1150,7 +1153,7 @@ void setup() {
       Serial.println(F("WARNING: RTC battery low! Time may be inaccurate."));
     }
     if (mv < BATT_LOW_MV && mv > 100) { battLow = true; lastBattBlink = millis(); }
-    startClock(lh, lm);
+    startClock(lh, lm, utcNow.second());
     applyAutoBrightness(true);
   } else {
     Serial.println(F("RTC not found!"));
