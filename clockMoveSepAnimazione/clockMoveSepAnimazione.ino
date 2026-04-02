@@ -31,6 +31,7 @@
 #include <EEPROM.h>
 #include <avr/pgmspace.h>
 #include <math.h>
+#include <avr/wdt.h>
 
 RTC_DS3231 rtc;
 bool rtcOk = false;
@@ -55,19 +56,21 @@ int autoBrLevel = 4;
 bool brManualOverride = false;  // true if user set brightness manually
 
 // ── DST EU (CET/CEST) ──────────────────────────────────────────────────────
+
+// Days in month (leap-year aware)
+byte daysInMon(int year, byte month) {
+  if (month == 2)
+    return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 29 : 28;
+  if (month == 4 || month == 6 || month == 9 || month == 11) return 30;
+  return 31;
+}
+
 // Last Sunday of month: returns day (1-31)
 byte lastSunday(int year, byte month) {
-  byte daysInMonth;
-  if (month == 2) {
-    daysInMonth = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 29 : 28;
-  } else if (month == 4 || month == 6 || month == 9 || month == 11) {
-    daysInMonth = 30;
-  } else {
-    daysInMonth = 31;
-  }
-  DateTime last(year, month, daysInMonth, 0, 0, 0);
+  byte dim = daysInMon(year, month);
+  DateTime last(year, month, dim, 0, 0, 0);
   byte dow = last.dayOfTheWeek();  // 0=Sun
-  return daysInMonth - dow;
+  return dim - dow;
 }
 
 // Returns true if UTC DateTime falls within EU daylight saving time
@@ -92,34 +95,33 @@ void utcToLocal(const DateTime &utc, int &lh, int &lm) {
   lm = utc.minute();
 }
 
-// Convert local time to UTC (for saving to DS3231)
-void localToUtc(int year, byte month, byte day, int lh, int lm, int ls,
-                DateTime &utcOut) {
-  int offset = 1;  // CET default
-  int uh = lh - 1;
+// Subtract hours from a local date/time and return a DateTime
+static DateTime subtractHours(int year, byte month, byte day,
+                              int lh, int lm, int ls, int hours) {
+  int uh = lh - hours;
   byte ud = day;
   byte um = month;
   int uy = year;
-  if (uh < 0) { uh += 24; ud--; }
-  if (ud == 0) {
-    um--;
-    if (um == 0) { um = 12; uy--; }
-    if (um == 2) ud = 28; else if (um == 4 || um == 6 || um == 9 || um == 11) ud = 30; else ud = 31;
-  }
-  DateTime trial(uy, um, ud, uh, lm, ls);
-  if (isDST(trial)) {
-    // Recalculate with CEST (UTC+2)
-    uh = lh - 2;
-    ud = day;
-    um = month;
-    uy = year;
-    if (uh < 0) { uh += 24; ud--; }
+  if (uh < 0) {
+    uh += 24;
+    ud--;
     if (ud == 0) {
       um--;
       if (um == 0) { um = 12; uy--; }
-      if (um == 2) ud = 28; else if (um == 4 || um == 6 || um == 9 || um == 11) ud = 30; else ud = 31;
+      ud = daysInMon(uy, um);
     }
-    trial = DateTime(uy, um, ud, uh, lm, ls);
+  }
+  return DateTime(uy, um, ud, uh, lm, ls);
+}
+
+// Convert local time to UTC (for saving to DS3231)
+void localToUtc(int year, byte month, byte day, int lh, int lm, int ls,
+                DateTime &utcOut) {
+  // Try CET first (UTC+1)
+  DateTime trial = subtractHours(year, month, day, lh, lm, ls, 1);
+  if (isDST(trial)) {
+    // Recalculate with CEST (UTC+2)
+    trial = subtractHours(year, month, day, lh, lm, ls, 2);
   }
   utcOut = trial;
 }
@@ -248,8 +250,8 @@ int   colOffset = 0;         // horizontal shift (-3..+4), changes every minute
 // Serial buffer (32 chars for GPS coordinates)
 char serialBuf[32];
 int  serialIdx = 0;
-bool serialSetMode = false;  // true after receiving "s:"
-bool serialPosMode = false;  // true after receiving "p:"
+enum SerialState { SER_IDLE, SER_PREFIX_S, SER_PREFIX_P, SER_SET, SER_POS };
+SerialState serState = SER_IDLE;
 
 // RTC low battery indicator
 bool battLow = false;
@@ -400,14 +402,14 @@ void animateDigits(int h1, int h2, int m1, int m2) {
     if (ch2) { wSP(bH2+k-1);     wD(bH2+k,     oh2); }
     if (cm1) { wSP(ocol_m1+k-1); wD(ocol_m1+k, om1); }
     if (cm2) { wSP(ocol_m2+k-1); wD(ocol_m2+k, om2); }
-    delay(ANIM_MOVE);
+    buzzWait(ANIM_MOVE);
   }
   // cleanup: digit occupied col+3 and col+4 in last step
   if (ch1) { wSP(ocol_h1+3); wSP(ocol_h1+4); }
   if (ch2) { wSP(bH2+3);     wSP(bH2+4);     }
   if (cm1) { wSP(ocol_m1+3); wSP(ocol_m1+4); }
   if (cm2) { wSP(ocol_m2+3); wSP(ocol_m2+4); }
-  delay(ANIM_BLANK);
+  buzzWait(ANIM_BLANK);
 
   // ── ENTER: 3 steps from the left ───────────────────────────────────────────
   for (int k = 3; k >= 1; k--) {
@@ -421,7 +423,7 @@ void animateDigits(int h1, int h2, int m1, int m2) {
     if (ch2) wD(bH2-k,     h2);
     if (cm1) wD(ncol_m1-k, m1);
     if (cm2) wD(ncol_m2-k, m2);
-    delay(ANIM_MOVE);
+    buzzWait(ANIM_MOVE);
   }
   // final position + cleanup col-1 (skip if TL=space: nothing to clean, risk of erasing neighbour)
   if (ch1) { if(dg(h1,0)!=0x20) wSP(ncol_h1-1); wD(ncol_h1, h1); }
@@ -547,30 +549,17 @@ void startClock(int h, int m, int sec = 0) {
   lastColon = millis() - (elapsedMs % 4000UL);
 }
 
-// ── Advance clock by N minutes ────────────────────────────────────────────────
+// ── Adjust clock by signed delta minutes ─────────────────────────────────────
 
-void advanceMinutes(int n) {
-  mm += n;
-  if (mm >= 60) { hh = (hh + mm / 60) % 24; mm %= 60; }
-  animateDigits(hh / 10, hh % 10, mm / 10, mm % 10);
-  updateOffset();
-  syncRTC();
-  colonCycle = 0;  colonPhase = 0;  lastColon = millis();
-  Serial.print(F("+")); Serial.print(n); Serial.print(F("min -> "));
-  if (hh < 10) Serial.print('0'); Serial.print(hh);
-  Serial.print(':');
-  if (mm < 10) Serial.print('0'); Serial.println(mm);
-}
-
-void decreaseMinutes(int n) {
-  int total = hh * 60 + mm - n;
-  if (total < 0) total = ((total % 1440) + 1440) % 1440;
+void adjustMinutes(int delta) {
+  int total = ((hh * 60 + mm + delta) % 1440 + 1440) % 1440;
   hh = total / 60;  mm = total % 60;
   animateDigits(hh / 10, hh % 10, mm / 10, mm % 10);
   updateOffset();
   syncRTC();
   colonCycle = 0;  colonPhase = 0;  lastColon = millis();
-  Serial.print(F("-")); Serial.print(n); Serial.print(F("min -> "));
+  Serial.print(delta > 0 ? F("+") : F(""));
+  Serial.print(delta); Serial.print(F("min -> "));
   if (hh < 10) Serial.print('0'); Serial.print(hh);
   Serial.print(':');
   if (mm < 10) Serial.print('0'); Serial.println(mm);
@@ -734,23 +723,21 @@ void handleSerialChar(char c) {
   if (c != '\n') Serial.write(c);
   else Serial.println();
 
-  // Set mode: collect characters after "s:"
-  if (serialSetMode) {
+  // Collecting data for s: or p: command
+  if (serState == SER_SET) {
     if (c == '\n') {
       handleSetCommand();
-      serialSetMode = false;
+      serState = SER_IDLE;
       serialIdx = 0;
     } else if (serialIdx < 15) {
       serialBuf[serialIdx++] = c;
     }
     return;
   }
-
-  // Position mode: collect characters after "p:"
-  if (serialPosMode) {
+  if (serState == SER_POS) {
     if (c == '\n') {
       handlePosCommand();
-      serialPosMode = false;
+      serState = SER_IDLE;
       serialIdx = 0;
     } else if (serialIdx < 30) {
       serialBuf[serialIdx++] = c;
@@ -758,16 +745,27 @@ void handleSerialChar(char c) {
     return;
   }
 
+  // Waiting for ':' after 's' or 'p'
+  if (serState == SER_PREFIX_S || serState == SER_PREFIX_P) {
+    if (c == ':') {
+      serState = (serState == SER_PREFIX_S) ? SER_SET : SER_POS;
+      serialIdx = 0;
+    } else {
+      serState = SER_IDLE;
+    }
+    return;
+  }
+
   // Clock commands
-  if (c == 'M' && clockRunning) { advanceMinutes(1);   serialIdx = 0; return; }
-  if (c == 'm' && clockRunning) { decreaseMinutes(1);  serialIdx = 0; return; }
-  if (c == 'H' && clockRunning) { advanceMinutes(60);  serialIdx = 0; return; }
-  if (c == 'h' && clockRunning) { decreaseMinutes(60); serialIdx = 0; return; }
-  if (c == 'D' && clockRunning) { advanceMinutes(10);  serialIdx = 0; return; }
-  if (c == 'd' && clockRunning) { decreaseMinutes(10); serialIdx = 0; return; }
+  if (c == 'M' && clockRunning) { adjustMinutes(1);   return; }
+  if (c == 'm' && clockRunning) { adjustMinutes(-1);  return; }
+  if (c == 'H' && clockRunning) { adjustMinutes(60);  return; }
+  if (c == 'h' && clockRunning) { adjustMinutes(-60); return; }
+  if (c == 'D' && clockRunning) { adjustMinutes(10);  return; }
+  if (c == 'd' && clockRunning) { adjustMinutes(-10); return; }
   // Brightness: 0=off, 1=25%, 2=50%, 3=75%, 4=100%, 9=auto
-  if (c >= '0' && c <= '4') { brManualOverride = true; setBrightness(c - '0'); serialIdx = 0; return; }
-  if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); serialIdx = 0; return; }
+  if (c >= '0' && c <= '4') { brManualOverride = true; setBrightness(c - '0'); return; }
+  if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
   // Replay boot animation
   if (c == 'i') {
     brSilent = true;
@@ -782,44 +780,32 @@ void handleSerialChar(char c) {
     applyAutoBrightness(true);
     if (clockRunning) redrawAll();
     else drawWaiting();
-    serialIdx = 0; return;
+    return;
   }
   // CR2032 battery voltage
   if (c == 'v') {
     int mv = readBattMv();
     Serial.print(F("Battery: "));
     Serial.print(mv / 1000); Serial.print('.'); Serial.print((mv % 1000) / 100); Serial.println(F("V"));
-    serialIdx = 0; return;
+    return;
   }
   // Software reset
   if (c == 'r') {
     lcd.command(0x08);  // display off
     lcd.clear();
     Serial.println(F("Reset..."));
-    delay(3000);
-    asm volatile ("jmp 0");
+    buzzWait(3000);
+    wdt_enable(WDTO_15MS);
+    while (true) {}
   }
-  // Start set command: "s:" or "p:"
-  if (c == 's') { serialBuf[0] = 's'; serialIdx = 0; return; }
-  if (c == 'p') { serialBuf[0] = 'p'; serialIdx = 0; return; }
-  if (c == ':' && serialIdx == 0) {
-    // Distinguish s: from p: based on last stored character
-    if (serialBuf[0] == 'p') { serialPosMode = true; }
-    else { serialSetMode = true; }
-    serialIdx = 0;
-    return;
-  }
-  serialIdx = 0;
+  // Start set/position command prefix
+  if (c == 's') { serState = SER_PREFIX_S; return; }
+  if (c == 'p') { serState = SER_PREFIX_P; return; }
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 // ── Boot Animation: DotDot ───────────────────────────────────────────────────
-
-void bootWaitMs(unsigned int ms) {
-  unsigned long t = millis();
-  while (millis() - t < ms) { updateBreathing(); }
-}
 
 void bootAnimation() {
   // 8 empty CGRAM tiles
@@ -862,10 +848,10 @@ void bootAnimation() {
         lcd.write((byte)sc[r][c]);
       }
     }
-    bootWaitMs(77);  // era 96
+    buzzWait(77);  // era 96
   }
 
-  bootWaitMs(192);  // era 240
+  buzzWait(192);  // era 240
 
   // Fade out + split from center — row 1 starts 2 steps before row 0
   #define STAGGER 2          // bottom row head-start steps
@@ -920,11 +906,11 @@ void bootAnimation() {
       edgeR[r]++;
     }
 
-    bootWaitMs(64);  // era 80
+    buzzWait(64);  // era 80
   }
 
   setBrightness(0);
-  bootWaitMs(128);  // era 160
+  buzzWait(128);  // era 160
   lcd.clear();
   setBrightness(1);
 }
@@ -997,7 +983,7 @@ void bootAnimationReverse() {
       }
     }
 
-    bootWaitMs(64);
+    buzzWait(64);
   }
 
   // Ensure entire screen is filled with tiles
@@ -1009,7 +995,7 @@ void bootAnimationReverse() {
     }
   }
 
-  bootWaitMs(192);
+  buzzWait(192);
 
   // Phase 2: decay (reverse of growth) — pixels disappear
   setBrightness(4);
@@ -1032,11 +1018,11 @@ void bootAnimationReverse() {
         lcd.write((byte)sc[r][c]);
       }
     }
-    bootWaitMs(77);
+    buzzWait(77);
   }
 
   setBrightness(0);
-  bootWaitMs(128);
+  buzzWait(128);
   lcd.clear();
   setBrightness(1);
 }
