@@ -504,17 +504,10 @@ void updateBreathing() {
     return;
   }
 
-  // Triangular ramp 0→255→0 over the breath period
-  int brightness;
-  unsigned long half = BREATH_PERIOD / 2;
-  if (cycle < half) {
-    brightness = (int)(cycle * 255UL / half);
-  } else {
-    brightness = (int)((BREATH_PERIOD - cycle) * 255UL / half);
-  }
-
-  // Exponential curve for a more natural feel
-  brightness = (brightness * brightness) / 255;
+  // Cosine ramp: smooth ease-in and ease-out, no snap at peak
+  // Maps cycle 0→BREATH_PERIOD to brightness 0→255→0 via raised cosine
+  float phase = (float)cycle / BREATH_PERIOD;          // 0.0 → 1.0
+  int brightness = (int)(127.5 * (1.0 - cos(2.0 * M_PI * phase)));
 
   // Software PWM: compare duty cycle with position in micro-cycle
   unsigned long pwmPos = micros() % BREATH_PWM_US;
