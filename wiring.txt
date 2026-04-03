@@ -1,0 +1,34 @@
+  WIRING VFD <-> Arduino Nano
+  VFD pin 4  (RS)  -> D12
+  VFD pin 5  (R/W) -> D11 (OUTPUT LOW)
+  VFD pin 6  (E)   -> D10
+  VFD pin 11 (D4)  -> D5
+  VFD pin 12 (D5)  -> D4
+  VFD pin 13 (D6)  -> D3
+  VFD pin 14 (D7)  -> D2
+  VFD pin 1 (VSS)  -> GND
+  VFD pin 2 (VDD)  -> +5V
+
+  WIRING RTC DS3231 (ZS-042) <-> Arduino Nano
+  RTC VCC  -> +5V
+  RTC GND  -> GND
+  RTC SDA  -> A4
+  RTC SCL  -> A5
+
+  BREATHING LED
+  D13 -> LED (with resistor)
+
+  PIEZO BUZZER
+  D9  -> 220 ohm -> buzzer signal
+  D8  -> buzzer GND (software ground, OUTPUT LOW)
+
+  BUTTON
+  D7  -> button (INPUT_PULLUP)
+  D6  -> button GND (software ground, OUTPUT LOW)
+
+  CR2032 BATTERY MONITORING
+  CR2032 (+) -> 100k ohm -> A3  (voltage reading, threshold 2.5V; resistor to prevent backfeed)
+
+  RECOMMENDED MODIFICATION
+  Desolder the Nano's onboard power LED to avoid visual interference
+  with the breathing LED on D13.
