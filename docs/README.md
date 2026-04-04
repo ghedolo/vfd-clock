@@ -2,7 +2,7 @@
 
 Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) driven by an **Arduino Nano**, with DS3231 RTC for accurate timekeeping.
 
-![VFD Clock Display](../grafica/preview/display_eh3v3.jpeg)
+![VFD Clock Display](../graphics/preview/display_eh3v3.jpeg)
 
 ## Features
 
@@ -33,7 +33,7 @@ Seven built-in font styles, parametrically generated from stroke width (h = vert
 
 Preview (edgy_h3v2, default):
 
-![Time Preview](../grafica/edgy_h3v2/cifre/time_13_24.png)
+![Time Preview](../graphics/edgy_h3v2/cifre/time_13_24.png)
 
 ## Wiring
 
