@@ -33,7 +33,7 @@ Seven built-in font styles, parametrically generated from stroke width (h = vert
 
 Preview (edgy_h3v2, default):
 
-![Time Preview](../graphics/edgy_h3v2/cifre/time_13_24.png)
+![Time Preview](../graphics/edgy_h3v2/digits/time_13_24.png)
 
 ## Wiring
 
