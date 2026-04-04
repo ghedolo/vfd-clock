@@ -389,6 +389,15 @@ const Font FONTS[] PROGMEM = {
 };
 #define NUM_FONTS (sizeof(FONTS) / sizeof(FONTS[0]))
 
+const char FN0[] PROGMEM = "edgy_h3v2";
+const char FN1[] PROGMEM = "edgy_h3v3";
+const char FN2[] PROGMEM = "edgy_h2v2";
+const char FN3[] PROGMEM = "curvy_h3v2";
+const char FN4[] PROGMEM = "curvy_h3v3";
+const char FN5[] PROGMEM = "curvy_h2v2";
+const char FN6[] PROGMEM = "curvy_h2v3";
+const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6 };
+
 byte currentFont = 0;
 
 // ── Column positions ─────────────────────────────────────────────────────────
@@ -1193,6 +1202,10 @@ void bootAnimationReverse() {
 
 void buttonAction() {
   currentFont = (currentFont + 1) % NUM_FONTS;
+  char buf[16];
+  strcpy_P(buf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
+  Serial.print(F("Font: "));
+  Serial.println(buf);
 
   brSilent = true;
   animSpeed = 2;
