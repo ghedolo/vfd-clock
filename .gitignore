@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+.venv/
+*.pyc
+claudeTools/
+oldSketch/
+CLAUDE.md
+requirements.txt
+docs/cablaggio.pdf
+docs/cablaggio.txt
+docs/conversazione.pdf
+docs/wiring.txt
+docs/futaba_202SD16_char.pdf
+docs/pt1602.pdf

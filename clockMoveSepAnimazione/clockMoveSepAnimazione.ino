@@ -203,31 +203,193 @@ void updateSunTimes() {
 // RS, E, D4, D5, D6, D7
 LiquidCrystal lcd(12, 10, 5, 4, 3, 2);
 
-// ── CGRAM tiles (stored in PROGMEM) ─────────────────────────────────────────
-const byte TILES[8][8] PROGMEM = {
-  { 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
-  { 0x1F, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07 }, // 1: flip(A)
-  { 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x1F }, // 2: C
-  { 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1F }, // 3: flip(C)
-  { 0x1F, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 4: F
-  { 0x1F, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1F }, // 5: G
-  { 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x1F }, // 6: flip(G)
-  { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 7: M
-};
+// ── Font system ─────────────────────────────────────────────────────────────
+// Each font: 8 tiles (8 bytes each) + 10 digits (4 bytes each)
+typedef struct {
+  byte tiles[8][8];
+  byte digits[10][4];
+} Font;
 
-// {TL, TR, BL, BR} — 0x20 = ROM space; 0x16 = ROM right vertical bar
-const byte DIGITS[10][4] PROGMEM = {
-  { 0,    1,    2,    3    },  // 0
-  { 0x20, 1,    0x20, 0x16 },  // 1
-  { 4,    5,    2,    7    },  // 2
-  { 4,    5,    7,    3    },  // 3
-  { 2,    3,    0x20, 3    },  // 4
-  { 6,    4,    7,    3    },  // 5
-  { 6,    4,    2,    3    },  // 6
-  { 0,    1,    0x20, 0x16 },  // 7
-  { 6,    5,    2,    3    },  // 8
-  { 6,    5,    7,    3    },  // 9
+const Font FONTS[] PROGMEM = {
+  // Font 0: edgy_h3v2 — vert bars 3 col, horiz bars 2 row
+  {
+    {
+      { 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
+      { 0x1F, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07 }, // 1: flip(A)
+      { 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x1F }, // 2: C
+      { 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1F }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 4: F
+      { 0x1F, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1F }, // 5: G
+      { 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x1F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x16 },  // 1  (ROM 0x16 = right 3 col)
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x16 },  // 7
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 1: edgy_h3v3 — vert bars 3 col, horiz bars 3 row
+  {
+    {
+      { 0x1F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
+      { 0x1F, 0x1F, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x07 }, // 1: flip(A)
+      { 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x1F, 0x1F }, // 2: C
+      { 0x07, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1F, 0x1F }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x1F, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 4: F
+      { 0x1F, 0x1F, 0x1F, 0x07, 0x07, 0x1F, 0x1F, 0x1F }, // 5: G
+      { 0x1F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1F, 0x1F, 0x1F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x16 },  // 1  (ROM 0x16 = right 3 col)
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x16 },  // 7
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 2: edgy_h2v2 — vert bars 2 col, horiz bars 2 row
+  {
+    {
+      { 0x1F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
+      { 0x1F, 0x1F, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03 }, // 1: flip(A)
+      { 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x1F, 0x1F }, // 2: C
+      { 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x1F, 0x1F }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 4: F
+      { 0x1F, 0x1F, 0x03, 0x03, 0x03, 0x03, 0x1F, 0x1F }, // 5: G
+      { 0x1F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x1F, 0x1F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x17 },  // 1  (ROM 0x17 = right 2 col)
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x17 },  // 7  (ROM 0x17 = right 2 col)
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 3: curvy_h3v2 — rounded corners, vert 3 col, horiz 2 row
+  {
+    {
+      { 0x0F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
+      { 0x1E, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07 }, // 1: flip(A)
+      { 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x0F }, // 2: C
+      { 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1E }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 4: F
+      { 0x1E, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1E }, // 5: G
+      { 0x0F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x0F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x16 },  // 1
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x16 },  // 7
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 4: curvy_h3v3 — rounded corners, vert 3 col, horiz 3 row
+  {
+    {
+      { 0x0F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
+      { 0x1E, 0x1F, 0x1F, 0x07, 0x07, 0x07, 0x07, 0x07 }, // 1: flip(A)
+      { 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1F, 0x1F, 0x0F }, // 2: C
+      { 0x07, 0x07, 0x07, 0x07, 0x07, 0x1F, 0x1F, 0x1E }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x1F, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 4: F
+      { 0x1E, 0x1F, 0x1F, 0x07, 0x07, 0x1F, 0x1F, 0x1E }, // 5: G
+      { 0x0F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1F, 0x1F, 0x0F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x16 },  // 1
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x16 },  // 7
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 5: curvy_h2v2 — rounded corners, vert 2 col, horiz 2 row
+  {
+    {
+      { 0x0F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
+      { 0x1E, 0x1F, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03 }, // 1: flip(A)
+      { 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x1F, 0x0F }, // 2: C
+      { 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x1F, 0x1E }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 4: F
+      { 0x1E, 0x1F, 0x03, 0x03, 0x03, 0x03, 0x1F, 0x1E }, // 5: G
+      { 0x0F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x1F, 0x0F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x17 },  // 1
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x17 },  // 7
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 6: curvy_h2v3 — rounded corners, vert 2 col, horiz 3 row
+  {
+    {
+      { 0x0F, 0x1F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
+      { 0x1E, 0x1F, 0x1F, 0x03, 0x03, 0x03, 0x03, 0x03 }, // 1: flip(A)
+      { 0x18, 0x18, 0x18, 0x18, 0x18, 0x1F, 0x1F, 0x0F }, // 2: C
+      { 0x03, 0x03, 0x03, 0x03, 0x03, 0x1F, 0x1F, 0x1E }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x1F, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 4: F
+      { 0x1E, 0x1F, 0x1F, 0x03, 0x03, 0x1F, 0x1F, 0x1E }, // 5: G
+      { 0x0F, 0x1F, 0x1F, 0x18, 0x18, 0x1F, 0x1F, 0x0F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x17 },  // 1
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x17 },  // 7
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
 };
+#define NUM_FONTS (sizeof(FONTS) / sizeof(FONTS[0]))
+
+byte currentFont = 0;
 
 // ── Column positions ─────────────────────────────────────────────────────────
 const int COL_H1    =  3;
@@ -282,9 +444,12 @@ void buzzOff() {
 }
 
 // Short pause with breathing LED active
+byte animSpeed = 1;  // 1 = normal, 2 = double speed
+
 void buzzWait(unsigned int ms) {
   unsigned long t = millis();
-  while (millis() - t < ms) { updateBreathing(); }
+  unsigned int actual = ms / animSpeed;
+  while (millis() - t < actual) { updateBreathing(); }
 }
 
 // Cricket chirp: 3 quick chirps at ~4.5 kHz
@@ -313,8 +478,17 @@ unsigned long breathStart = 0;
 
 // ── Display functions ────────────────────────────────────────────────────────
 
-// Helper: read byte from DIGITS matrix in PROGMEM
-inline byte dg(int d, int i) { return pgm_read_byte(&DIGITS[d][i]); }
+// Helper: read byte from current font's DIGITS matrix in PROGMEM
+inline byte dg(int d, int i) { return pgm_read_byte(&FONTS[currentFont].digits[d][i]); }
+
+// Load current font tiles into CGRAM
+void loadFont() {
+  byte tmp[8];
+  for (int t = 0; t < 8; t++) {
+    memcpy_P(tmp, FONTS[currentFont].tiles[t], 8);
+    lcd.createChar(t, tmp);
+  }
+}
 
 void printBigDigit(int d, int col) {
   lcd.setCursor(col, 0);
@@ -764,12 +938,7 @@ void handleSerialChar(char c) {
     brSilent = true;
     bootAnimation();
     brSilent = false;
-    // Reload clock tiles into CGRAM
-    byte tmp[8];
-    for (int t = 0; t < 8; t++) {
-      memcpy_P(tmp, TILES[t], 8);
-      lcd.createChar(t, tmp);
-    }
+    loadFont();
     applyAutoBrightness(true);
     if (clockRunning) redrawAll();
     else drawWaiting();
@@ -1020,21 +1189,18 @@ void bootAnimationReverse() {
   setBrightness(1);
 }
 
-// ── Triple boot sequence (normal + reverse + normal) ─────────────────────────
+// ── Button: single intro + next font ────────────────────────────────────────
 
-void tripleBootSequence() {
+void buttonAction() {
+  currentFont = (currentFont + 1) % NUM_FONTS;
+
   brSilent = true;
+  animSpeed = 2;
   bootAnimation();
-  bootAnimationReverse();
-  bootAnimation();
+  animSpeed = 1;
   brSilent = false;
 
-  // Reload clock tiles into CGRAM
-  byte tmp[8];
-  for (int t = 0; t < 8; t++) {
-    memcpy_P(tmp, TILES[t], 8);
-    lcd.createChar(t, tmp);
-  }
+  loadFont();
   applyAutoBrightness(true);
   if (clockRunning) redrawAll();
   else drawWaiting();
@@ -1086,12 +1252,7 @@ void setup() {
   bootAnimation();
   brSilent = false;
 
-  // Load tiles from PROGMEM into CGRAM (temporary buffer on stack)
-  byte tmp[8];
-  for (int t = 0; t < 8; t++) {
-    memcpy_P(tmp, TILES[t], 8);
-    lcd.createChar(t, tmp);
-  }
+  loadFont();
 
   loadGpsFromEeprom();
   Serial.print(F("Pos: ")); Serial.print(gpsLat, 4);
@@ -1166,7 +1327,7 @@ void loop() {
 
   updateBreathing();  // breathing LED always active
 
-  // Button on D7: triple boot sequence (simple debounce)
+  // Button on D7: intro animation + next font (simple debounce)
   if (digitalRead(BTN_PIN) == LOW) {
     delay(50);  // debounce
     if (digitalRead(BTN_PIN) == LOW) {
@@ -1184,7 +1345,7 @@ void loop() {
         Serial.print(':');
         if (lm < 10) Serial.print('0'); Serial.println(lm);
       }
-      tripleBootSequence();
+      buttonAction();
       while (digitalRead(BTN_PIN) == LOW) { updateBreathing(); }  // wait for release
     }
   }
