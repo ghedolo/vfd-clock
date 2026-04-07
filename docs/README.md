@@ -19,7 +19,7 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Fonts
 
-Seven built-in font styles, parametrically generated from stroke width (h = horizontal bar rows, v = vertical bar columns):
+Eight built-in font styles. The first seven are parametrically generated from stroke width (h = horizontal bar rows, v = vertical bar columns); the eighth is a hand-designed alien/runic font with diagonal strokes:
 
 | Font | Style | Horizontal (h) | Vertical (v) |
 |---|---|---|---|
@@ -30,6 +30,7 @@ Seven built-in font styles, parametrically generated from stroke width (h = hori
 | curvy_h3v3 | Rounded corners | 3 rows | 3 cols |
 | curvy_h2v2 | Rounded corners | 2 rows | 2 cols |
 | curvy_h3v2 | Rounded corners | 3 rows | 2 cols |
+| alien | Diagonal rune glyphs | — | — |
 
 Preview (edgy_h2v3, default):
 

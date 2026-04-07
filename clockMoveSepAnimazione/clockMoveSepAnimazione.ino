@@ -387,6 +387,31 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
+  // Font 7: alien — diagonal strokes with dot accents (rune glyphs)
+  {
+    {
+      { 0x1F, 0x01, 0x02, 0x04, 0x04, 0x08, 0x10, 0x10 }, // 0: Diag-Down-Left (/ with top bar)
+      { 0x1F, 0x10, 0x08, 0x04, 0x04, 0x02, 0x01, 0x01 }, // 1: Diag-Down-Right (\ with top bar)
+      { 0x10, 0x10, 0x08, 0x04, 0x04, 0x02, 0x01, 0x1F }, // 2: Diag-Up-Left (/ with bottom bar)
+      { 0x01, 0x01, 0x02, 0x04, 0x04, 0x08, 0x10, 0x1F }, // 3: Diag-Up-Right (\ with bottom bar)
+      { 0x1F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00 }, // 4: Top-Cap (bar + dot accent)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x1F }, // 5: Bot-Cap (dot accent + bar)
+      { 0x18, 0x18, 0x18, 0x1A, 0x18, 0x18, 0x18, 0x18 }, // 6: Left-Vert-Dotted
+      { 0x03, 0x03, 0x03, 0x0B, 0x03, 0x03, 0x03, 0x03 }, // 7: Right-Vert-Dotted
+    },
+    {
+      { 0,    1,    2,    3    },  // 0  diamond
+      { 0x20, 7,    0x20, 7    },  // 1  right vert dotted
+      { 4,    0,    3,    5    },  // 2  Z-zigzag
+      { 4,    0,    5,    2    },  // 3  angular right
+      { 6,    7,    0x20, 7    },  // 4  crossed verticals
+      { 1,    4,    5,    2    },  // 5  S-zigzag
+      { 1,    4,    3,    2    },  // 6  closed bottom
+      { 4,    1,    0x20, 7    },  // 7  angular descent
+      { 1,    0,    3,    2    },  // 8  hourglass
+      { 1,    0,    5,    2    },  // 9  open bottom-left
+    }
+  },
 };
 #define NUM_FONTS (sizeof(FONTS) / sizeof(FONTS[0]))
 
@@ -397,7 +422,8 @@ const char FN3[] PROGMEM = "curvy_h2v3";
 const char FN4[] PROGMEM = "curvy_h3v3";
 const char FN5[] PROGMEM = "curvy_h2v2";
 const char FN6[] PROGMEM = "curvy_h3v2";
-const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6 };
+const char FN7[] PROGMEM = "alien";
+const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7 };
 
 byte currentFont = 0;
 
