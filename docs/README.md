@@ -6,7 +6,7 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Features
 
-- **7 switchable big-font styles** — 3 edgy + 4 curvy variants, each digit spans 2 rows x 2 character cells using 8 custom CGRAM tiles. Button press cycles through fonts with a boot animation at 2x speed.
+- **7+1 switchable big-font styles** — 3 edgy + 4 curvy variants, each digit spans 2 rows x 2 character cells using 8 custom CGRAM tiles. Button press cycles through the 7 parametric fonts; double-press activates the hidden alien font.
 - **Animated colon separator** — 19-step animation cycle with filled/empty lozenge characters (ROM 0x96/0x97)
 - **Horizontal pixel-wear shifting** — the clock periodically shifts position across the display to distribute phosphor wear
 - **Auto-dimming** — brightness adjusts automatically based on sunrise/sunset times, calculated from GPS coordinates stored in EEPROM

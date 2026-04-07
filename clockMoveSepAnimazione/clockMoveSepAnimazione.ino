@@ -1280,7 +1280,9 @@ void switchToFont(byte idx) {
 #define DOUBLE_PRESS_MS 500
 
 void buttonAction() {
-  switchToFont((currentFont + 1) % NUM_FONTS);
+  byte next = (currentFont + 1) % NUM_FONTS;
+  if (next == ALIEN_FONT_IDX) next = 0;  // skip alien in normal carousel
+  switchToFont(next);
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
