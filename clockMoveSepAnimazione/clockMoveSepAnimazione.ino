@@ -390,10 +390,10 @@ const Font FONTS[] PROGMEM = {
   // Font 7: alien — diagonal strokes with dot accents (rune glyphs)
   {
     {
-      { 0x1F, 0x01, 0x02, 0x04, 0x04, 0x08, 0x10, 0x10 }, // 0: Diag-Down-Left (/ with top bar)
-      { 0x1F, 0x10, 0x08, 0x04, 0x04, 0x02, 0x01, 0x01 }, // 1: Diag-Down-Right (\ with top bar)
-      { 0x10, 0x10, 0x08, 0x04, 0x04, 0x02, 0x01, 0x1F }, // 2: Diag-Up-Left (/ with bottom bar)
-      { 0x01, 0x01, 0x02, 0x04, 0x04, 0x08, 0x10, 0x1F }, // 3: Diag-Up-Right (\ with bottom bar)
+      { 0x1F, 0x03, 0x06, 0x0C, 0x0C, 0x18, 0x10, 0x10 }, // 0: Diag-Down-Left (/ 2px with top bar)
+      { 0x1F, 0x18, 0x0C, 0x06, 0x06, 0x03, 0x01, 0x01 }, // 1: Diag-Down-Right (\ 2px with top bar)
+      { 0x10, 0x10, 0x18, 0x0C, 0x0C, 0x06, 0x03, 0x1F }, // 2: Diag-Up-Left (/ 2px with bottom bar)
+      { 0x01, 0x01, 0x03, 0x06, 0x06, 0x0C, 0x18, 0x1F }, // 3: Diag-Up-Right (\ 2px with bottom bar)
       { 0x1F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00 }, // 4: Top-Cap (bar + dot accent)
       { 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x1F }, // 5: Bot-Cap (dot accent + bar)
       { 0x18, 0x18, 0x18, 0x1A, 0x18, 0x18, 0x18, 0x18 }, // 6: Left-Vert-Dotted
@@ -401,10 +401,10 @@ const Font FONTS[] PROGMEM = {
     },
     {
       { 0,    1,    2,    3    },  // 0  diamond
-      { 0x20, 7,    0x20, 7    },  // 1  right vert dotted
+      { 0x20, 7,    0x20, 0x17 },  // 1  right vert dotted + ROM bar
       { 4,    0,    3,    5    },  // 2  Z-zigzag
       { 4,    0,    5,    2    },  // 3  angular right
-      { 6,    7,    0x20, 7    },  // 4  crossed verticals
+      { 6,    5,    0x20, 0x17 },  // 4  left vert + bot-cap, ROM bar
       { 1,    4,    5,    2    },  // 5  S-zigzag
       { 1,    4,    3,    2    },  // 6  closed bottom
       { 4,    1,    0x20, 7    },  // 7  angular descent
@@ -414,6 +414,7 @@ const Font FONTS[] PROGMEM = {
   },
 };
 #define NUM_FONTS (sizeof(FONTS) / sizeof(FONTS[0]))
+#define ALIEN_FONT_IDX  (NUM_FONTS - 1)
 
 const char FN0[] PROGMEM = "edgy_h2v3";
 const char FN1[] PROGMEM = "edgy_h3v3";
@@ -564,11 +565,19 @@ const unsigned int colonDur[COLON_FRAMES] PROGMEM = {
   2419, 50, 57, 64, 71, 168, 86, 93, 90, 95, 90, 85, 80, 75, 70, 242, 60, 55, 50
 };
 
+byte alienSep(byte ch) {
+  if (currentFont == ALIEN_FONT_IDX) {
+    if (ch == 0x96) return 0xDC;  // filled lozenge → Futaba ROM 0xDC
+    if (ch == 0x97) return 0xCC;  // empty lozenge  → Futaba ROM 0xCC
+  }
+  return ch;
+}
+
 void drawColon() {
   int cc = COL_COLON + colOffset;
   if (cc >= 0 && cc <= 19) {
-    lcd.setCursor(cc, 0); lcd.write(pgm_read_byte(&colonAnim[colonPhase][0]));
-    lcd.setCursor(cc, 1); lcd.write(pgm_read_byte(&colonAnim[colonPhase][1]));
+    lcd.setCursor(cc, 0); lcd.write(alienSep(pgm_read_byte(&colonAnim[colonPhase][0])));
+    lcd.setCursor(cc, 1); lcd.write(alienSep(pgm_read_byte(&colonAnim[colonPhase][1])));
   }
 }
 
@@ -1249,8 +1258,8 @@ void bootAnimationReverse() {
 
 // ── Button: single intro + next font ────────────────────────────────────────
 
-void buttonAction() {
-  currentFont = (currentFont + 1) % NUM_FONTS;
+void switchToFont(byte idx) {
+  currentFont = idx;
   char buf[16];
   strcpy_P(buf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
   Serial.print(F("Font: "));
@@ -1266,6 +1275,12 @@ void buttonAction() {
   applyAutoBrightness(true);
   if (clockRunning) redrawAll();
   else drawWaiting();
+}
+
+#define DOUBLE_PRESS_MS 500
+
+void buttonAction() {
+  switchToFont((currentFont + 1) % NUM_FONTS);
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -1390,7 +1405,7 @@ void loop() {
 
   updateBreathing();  // breathing LED always active
 
-  // Button on D7: intro animation + next font (simple debounce)
+  // Button on D7: single press = next font, double press = alien font
   if (digitalRead(BTN_PIN) == LOW) {
     delay(50);  // debounce
     if (digitalRead(BTN_PIN) == LOW) {
@@ -1408,8 +1423,26 @@ void loop() {
         Serial.print(':');
         if (lm < 10) Serial.print('0'); Serial.println(lm);
       }
-      buttonAction();
       while (digitalRead(BTN_PIN) == LOW) { updateBreathing(); }  // wait for release
+      // Wait for possible second press
+      unsigned long rel = millis();
+      bool dbl = false;
+      while (millis() - rel < DOUBLE_PRESS_MS) {
+        updateBreathing();
+        if (digitalRead(BTN_PIN) == LOW) {
+          delay(50);
+          if (digitalRead(BTN_PIN) == LOW) {
+            dbl = true;
+            while (digitalRead(BTN_PIN) == LOW) { updateBreathing(); }
+            break;
+          }
+        }
+      }
+      if (dbl) {
+        switchToFont(ALIEN_FONT_IDX);
+      } else {
+        buttonAction();
+      }
     }
   }
 
