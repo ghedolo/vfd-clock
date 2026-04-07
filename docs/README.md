@@ -19,21 +19,21 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Fonts
 
-Seven built-in font styles, parametrically generated from stroke width (h = vertical bar columns, v = horizontal bar rows):
+Seven built-in font styles, parametrically generated from stroke width (h = horizontal bar rows, v = vertical bar columns):
 
-| Font | Style | Vertical (h) | Horizontal (v) |
+| Font | Style | Horizontal (h) | Vertical (v) |
 |---|---|---|---|
-| edgy_h3v2 | Sharp corners | 3 cols | 2 rows |
-| edgy_h3v3 | Sharp corners | 3 cols | 3 rows |
-| edgy_h2v2 | Sharp corners | 2 cols | 2 rows |
-| curvy_h3v2 | Rounded corners | 3 cols | 2 rows |
-| curvy_h3v3 | Rounded corners | 3 cols | 3 rows |
-| curvy_h2v2 | Rounded corners | 2 cols | 2 rows |
-| curvy_h2v3 | Rounded corners | 2 cols | 3 rows |
+| edgy_h2v3 | Sharp corners | 2 rows | 3 cols |
+| edgy_h3v3 | Sharp corners | 3 rows | 3 cols |
+| edgy_h2v2 | Sharp corners | 2 rows | 2 cols |
+| curvy_h2v3 | Rounded corners | 2 rows | 3 cols |
+| curvy_h3v3 | Rounded corners | 3 rows | 3 cols |
+| curvy_h2v2 | Rounded corners | 2 rows | 2 cols |
+| curvy_h3v2 | Rounded corners | 3 rows | 2 cols |
 
-Preview (edgy_h3v2, default):
+Preview (edgy_h2v3, default):
 
-![Time Preview](../graphics/edgy_h3v2/digits/time_13_24.png)
+![Time Preview](../graphics/edgy_h2v3/digits/time_13_24.png)
 
 ## Wiring
 
@@ -65,9 +65,9 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 | Command | Description |
 |---|---|
 | `s:DDMMYYYY-HHmmSS` | Set local date and time |
-| `M` / `m` | +/- 1 minute |
-| `D` / `d` | +/- 10 minutes |
-| `H` / `h` | +/- 1 hour |
+| `M` / `m` | +/- 1 minute *(updates RTC)* |
+| `D` / `d` | +/- 10 minutes *(updates RTC)* |
+| `H` / `h` | +/- 1 hour *(updates RTC)* |
 | `0`-`4` | Brightness (0=off, 1=25%, 2=50%, 3=75%, 4=100%) |
 | `9` | Auto-dimming (sunrise/sunset) |
 | `p:lat,lon` | Set GPS position (e.g. `p:41.9028,12.4964`) |

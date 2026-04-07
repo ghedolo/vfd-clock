@@ -53,6 +53,7 @@ int lastSunDay = -1;  // day of year of last calculation
 
 // Auto-dimming: current automatic brightness level
 int autoBrLevel = 4;
+int curBrLevel = 1;  // current brightness level (0=off..4=100%)
 bool brManualOverride = false;  // true if user set brightness manually
 
 // ── DST EU (CET/CEST) ──────────────────────────────────────────────────────
@@ -211,7 +212,7 @@ typedef struct {
 } Font;
 
 const Font FONTS[] PROGMEM = {
-  // Font 0: edgy_h3v2 — vert bars 3 col, horiz bars 2 row
+  // Font 0: edgy_h2v3 — horiz bars 2 row, vert bars 3 col
   {
     {
       { 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
@@ -236,7 +237,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 1: edgy_h3v3 — vert bars 3 col, horiz bars 3 row
+  // Font 1: edgy_h3v3 — horiz bars 3 row, vert bars 3 col
   {
     {
       { 0x1F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
@@ -261,7 +262,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 2: edgy_h2v2 — vert bars 2 col, horiz bars 2 row
+  // Font 2: edgy_h2v2 — horiz bars 2 row, vert bars 2 col
   {
     {
       { 0x1F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
@@ -286,7 +287,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 3: curvy_h3v2 — rounded corners, vert 3 col, horiz 2 row
+  // Font 3: curvy_h2v3 — rounded corners, horiz 2 row, vert 3 col
   {
     {
       { 0x0F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
@@ -311,7 +312,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 4: curvy_h3v3 — rounded corners, vert 3 col, horiz 3 row
+  // Font 4: curvy_h3v3 — rounded corners, horiz 3 row, vert 3 col
   {
     {
       { 0x0F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
@@ -336,7 +337,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 5: curvy_h2v2 — rounded corners, vert 2 col, horiz 2 row
+  // Font 5: curvy_h2v2 — rounded corners, horiz 2 row, vert 2 col
   {
     {
       { 0x0F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
@@ -361,7 +362,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 6: curvy_h2v3 — rounded corners, vert 2 col, horiz 3 row
+  // Font 6: curvy_h3v2 — rounded corners, horiz 3 row, vert 2 col
   {
     {
       { 0x0F, 0x1F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
@@ -389,13 +390,13 @@ const Font FONTS[] PROGMEM = {
 };
 #define NUM_FONTS (sizeof(FONTS) / sizeof(FONTS[0]))
 
-const char FN0[] PROGMEM = "edgy_h3v2";
+const char FN0[] PROGMEM = "edgy_h2v3";
 const char FN1[] PROGMEM = "edgy_h3v3";
 const char FN2[] PROGMEM = "edgy_h2v2";
-const char FN3[] PROGMEM = "curvy_h3v2";
+const char FN3[] PROGMEM = "curvy_h2v3";
 const char FN4[] PROGMEM = "curvy_h3v3";
 const char FN5[] PROGMEM = "curvy_h2v2";
-const char FN6[] PROGMEM = "curvy_h2v3";
+const char FN6[] PROGMEM = "curvy_h3v2";
 const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6 };
 
 byte currentFont = 0;
@@ -749,6 +750,7 @@ const byte brMap[] PROGMEM = { 0, 0b11, 0b10, 0b01, 0b00 };
 bool brSilent = false;  // true during boot animations to silence Serial
 
 void setBrightness(int level) {
+  curBrLevel = level;
   if (level == 0) {
     lcd.command(0x08);
     if (!brSilent) Serial.println(F("Display OFF"));
@@ -951,6 +953,27 @@ void handleSerialChar(char c) {
     applyAutoBrightness(true);
     if (clockRunning) redrawAll();
     else drawWaiting();
+    return;
+  }
+  // Overall status on one line
+  if (c == 'o') {
+    DateTime utc = rtcOk ? rtc.now() : DateTime((uint32_t)0);
+    bool dst = rtcOk ? isDST(utc) : false;
+    int off = dst ? 2 : 1;
+    DateTime loc = DateTime(utc.unixtime() + (uint32_t)off * 3600UL);
+    int mv = readBattMv();
+    char fbuf[16];
+    strcpy_P(fbuf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
+    char line[80];
+    snprintf(line, sizeof(line),
+             "%04u-%02u-%02u %02u:%02u:%02u DST:%s BR:%d%% BATT:%d.%02dV FONT:%s",
+             loc.year(), loc.month(), loc.day(),
+             loc.hour(), loc.minute(), loc.second(),
+             dst ? "YES" : "NO",
+             curBrLevel * 25,
+             mv / 1000, (mv % 1000) / 10,
+             fbuf);
+    Serial.println(line);
     return;
   }
   // CR2032 battery voltage
@@ -1249,13 +1272,14 @@ void setup() {
   Serial.println();
   Serial.println(F("Commands:"));
   Serial.println(F("  s:DDMMYYYY-HHmmSS  Set local date and time"));
-  Serial.println(F("  M/m                +/- 1 minute"));
-  Serial.println(F("  D/d                +/- 10 minutes"));
-  Serial.println(F("  H/h                +/- 1 hour"));
+  Serial.println(F("  M/m                +/- 1 minute  (updates RTC)"));
+  Serial.println(F("  D/d                +/- 10 minutes (updates RTC)"));
+  Serial.println(F("  H/h                +/- 1 hour    (updates RTC)"));
   Serial.println(F("  0-4                Brightness (0=off 1=25% 2=50% 3=75% 4=100%)"));
   Serial.println(F("  9                  Auto-dimming (sunrise/sunset)"));
   Serial.println(F("  p:lat,lon          GPS position (e.g. p:41.9028,12.4964)"));
   Serial.println(F("  v                  CR2032 battery voltage"));
+  Serial.println(F("  o                  Overall status (one line)"));
   Serial.println(F("  i                  Replay boot animation"));
   Serial.println(F("  r                  Software reset"));
   Serial.println();
@@ -1398,6 +1422,25 @@ void loop() {
           DateTime utcNow = rtc.now();
           int lh, lm;
           utcToLocal(utcNow, lh, lm);
+          // Drift between animation (millis, ceramic resonator) and RTC
+          // (DS3231 crystal). ds > 0 = animation late, ds < 0 = early.
+          int ds = (int)utcNow.second();
+          if (ds > 30) ds -= 60;
+          Serial.print(F("delta: "));
+          Serial.print(ds);
+          Serial.println(F(" s"));
+          // Hard-reset lastColon to current time. This kills any
+          // accumulated debt that would cause a frame burst cascade.
+          lastColon = millis();
+          // Then apply drift correction: clamp to ±2000ms (must stay
+          // below colonDur[0] = 2419ms to avoid burst on frame 0).
+          if (ds > 0) {
+            unsigned long back = min((unsigned long)ds * 1000UL, 2000UL);
+            lastColon -= back;
+          } else if (ds < 0) {
+            unsigned long fwd = min((unsigned long)(-ds) * 1000UL, 2000UL);
+            lastColon += fwd;
+          }
           hh = lh; mm = lm;
         } else {
           if (++mm >= 60) { mm = 0; if (++hh >= 24) hh = 0; }
