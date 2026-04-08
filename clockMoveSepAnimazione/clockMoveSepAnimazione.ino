@@ -287,7 +287,32 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 3: curvy_h2v3 — rounded corners, horiz 2 row, vert 3 col
+  // Font 3: edgy_h3v4 — horiz bars 3 row, vert bars 4 col
+  {
+    {
+      { 0x1F, 0x1F, 0x1F, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E }, // 0: A
+      { 0x1F, 0x1F, 0x1F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F }, // 1: flip(A)
+      { 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1F, 0x1F, 0x1F }, // 2: C
+      { 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x1F, 0x1F, 0x1F }, // 3: flip(C)
+      { 0x1F, 0x1F, 0x1F, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 4: F
+      { 0x1F, 0x1F, 0x1F, 0x0F, 0x0F, 0x1F, 0x1F, 0x1F }, // 5: G
+      { 0x1F, 0x1F, 0x1F, 0x1E, 0x1E, 0x1F, 0x1F, 0x1F }, // 6: flip(G)
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F, 0x1F }, // 7: M
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 0x15 },  // 1  (ROM 0x15 = right 4 col)
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 0x15 },  // 7  (ROM 0x15 = right 4 col)
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 4: curvy_h2v3 — rounded corners, horiz 2 row, vert 3 col
   {
     {
       { 0x0F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
@@ -312,7 +337,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 4: curvy_h3v3 — rounded corners, horiz 3 row, vert 3 col
+  // Font 5: curvy_h3v3 — rounded corners, horiz 3 row, vert 3 col
   {
     {
       { 0x0F, 0x1F, 0x1F, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C }, // 0: A
@@ -337,7 +362,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 5: curvy_h2v2 — rounded corners, horiz 2 row, vert 2 col
+  // Font 6: curvy_h2v2 — rounded corners, horiz 2 row, vert 2 col
   {
     {
       { 0x0F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
@@ -362,7 +387,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 6: curvy_h3v2 — rounded corners, horiz 3 row, vert 2 col
+  // Font 7: curvy_h3v2 — rounded corners, horiz 3 row, vert 2 col
   {
     {
       { 0x0F, 0x1F, 0x1F, 0x18, 0x18, 0x18, 0x18, 0x18 }, // 0: A
@@ -387,7 +412,7 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 7: alien — diagonal strokes with dot accents (rune glyphs)
+  // Font 8: alien — diagonal strokes with dot accents (rune glyphs)
   {
     {
       { 0x1F, 0x03, 0x06, 0x0C, 0x0C, 0x18, 0x10, 0x10 }, // 0: Diag-Down-Left (/ 2px with top bar)
@@ -419,12 +444,13 @@ const Font FONTS[] PROGMEM = {
 const char FN0[] PROGMEM = "edgy_h2v3";
 const char FN1[] PROGMEM = "edgy_h3v3";
 const char FN2[] PROGMEM = "edgy_h2v2";
-const char FN3[] PROGMEM = "curvy_h2v3";
-const char FN4[] PROGMEM = "curvy_h3v3";
-const char FN5[] PROGMEM = "curvy_h2v2";
-const char FN6[] PROGMEM = "curvy_h3v2";
-const char FN7[] PROGMEM = "alien";
-const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7 };
+const char FN3[] PROGMEM = "edgy_h3v4";
+const char FN4[] PROGMEM = "curvy_h2v3";
+const char FN5[] PROGMEM = "curvy_h3v3";
+const char FN6[] PROGMEM = "curvy_h2v2";
+const char FN7[] PROGMEM = "curvy_h3v2";
+const char FN8[] PROGMEM = "alien";
+const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8 };
 
 byte currentFont = 0;
 
