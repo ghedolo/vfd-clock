@@ -453,6 +453,8 @@ const char FN8[] PROGMEM = "alien";
 const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8 };
 
 byte currentFont = 0;
+bool fantasyGroup = false;        // false = standard (0-7), true = fantasy (alien + checker)
+byte fantasyIdx = 0;              // 0 = alien, 1 = checker
 
 // ── Column positions ─────────────────────────────────────────────────────────
 const int COL_H1    =  3;
@@ -1041,20 +1043,16 @@ void handleSerialChar(char c) {
   if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
   // Toggle checkerboard mode
   if (c == 'c') {
-    checkerMode = !checkerMode;
     if (checkerMode) {
-      currentFont = CHECKER_BASE_FONT;
-      checkerPhaseB = false;
-      checkerStep = 0;
-      checkerCycle = 0;
-      lastCheckerFlip = millis();
-      loadFontCheckerboard(false);
-      Serial.println(F("Checker ON"));
+      checkerMode = false;
+      fantasyGroup = true;
+      fantasyIdx = 0;
+      switchToFont(ALIEN_FONT_IDX);
     } else {
-      loadFont();
-      Serial.println(F("Checker OFF"));
+      fantasyGroup = true;
+      fantasyIdx = 1;
+      activateChecker();
     }
-    if (clockRunning) redrawAll(); else drawWaiting();
     return;
   }
   // Replay boot animation
@@ -1334,7 +1332,10 @@ void bootAnimationReverse() {
   setBrightness(1);
 }
 
-// ── Button: single intro + next font ────────────────────────────────────────
+// ── Button: single = cycle within group, double = switch group ──────────────
+
+#define DOUBLE_PRESS_MS 500
+#define STD_FONT_COUNT  (ALIEN_FONT_IDX)  // fonts 0..(ALIEN-1) are standard
 
 void switchToFont(byte idx) {
   checkerMode = false;
@@ -1356,12 +1357,42 @@ void switchToFont(byte idx) {
   else drawWaiting();
 }
 
-#define DOUBLE_PRESS_MS 500
+void activateChecker() {
+  checkerMode = true;
+  currentFont = CHECKER_BASE_FONT;
+  checkerPhaseB = false;
+  checkerStep = 0;
+  checkerCycle = 0;
+  lastCheckerFlip = millis();
+  loadFontCheckerboard(false);
+  Serial.println(F("Checker ON"));
+  if (clockRunning) redrawAll(); else drawWaiting();
+}
 
-void buttonAction() {
-  byte next = (currentFont + 1) % NUM_FONTS;
-  if (next == ALIEN_FONT_IDX) next = 0;  // skip alien in normal carousel
-  switchToFont(next);
+void nextInGroup() {
+  if (!fantasyGroup) {
+    // Standard: cycle 0..(STD_FONT_COUNT-1)
+    byte next = (currentFont + 1) % STD_FONT_COUNT;
+    switchToFont(next);
+  } else {
+    // Fantasy: toggle between alien and checker
+    fantasyIdx = 1 - fantasyIdx;
+    if (fantasyIdx == 0) {
+      switchToFont(ALIEN_FONT_IDX);
+    } else {
+      activateChecker();
+    }
+  }
+}
+
+void switchGroup() {
+  fantasyGroup = !fantasyGroup;
+  if (fantasyGroup) {
+    fantasyIdx = 0;
+    switchToFont(ALIEN_FONT_IDX);
+  } else {
+    switchToFont(0);
+  }
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -1486,7 +1517,7 @@ void loop() {
 
   updateBreathing();  // breathing LED always active
 
-  // Button on D7: single press = next font, double press = alien font
+  // Button on D7: single = cycle in group, double = switch group
   if (digitalRead(BTN_PIN) == LOW) {
     delay(50);  // debounce
     if (digitalRead(BTN_PIN) == LOW) {
@@ -1519,41 +1550,10 @@ void loop() {
           }
         }
       }
-      // Triple press detection
-      bool trpl = false;
       if (dbl) {
-        unsigned long rel2 = millis();
-        while (millis() - rel2 < DOUBLE_PRESS_MS) {
-          updateBreathing();
-          if (digitalRead(BTN_PIN) == LOW) {
-            delay(50);
-            if (digitalRead(BTN_PIN) == LOW) {
-              trpl = true;
-              while (digitalRead(BTN_PIN) == LOW) { updateBreathing(); }
-              break;
-            }
-          }
-        }
-      }
-      if (trpl) {
-        checkerMode = !checkerMode;
-        if (checkerMode) {
-          currentFont = CHECKER_BASE_FONT;
-          checkerPhaseB = false;
-          checkerStep = 0;
-          checkerCycle = 0;
-          lastCheckerFlip = millis();
-          loadFontCheckerboard(false);
-          Serial.println(F("Checker ON"));
-        } else {
-          loadFont();
-          Serial.println(F("Checker OFF"));
-        }
-        if (clockRunning) redrawAll(); else drawWaiting();
-      } else if (dbl) {
-        switchToFont(ALIEN_FONT_IDX);
+        switchGroup();
       } else {
-        buttonAction();
+        nextInGroup();
       }
     }
   }

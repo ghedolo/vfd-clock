@@ -6,7 +6,7 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Features
 
-- **7+1+1 switchable big-font styles** — 3 edgy + 4 curvy variants, each digit spans 2 rows x 2 character cells using 8 custom CGRAM tiles. Button press cycles through the 7 parametric fonts; double-press activates the hidden alien font; triple-press activates checkerboard mode.
+- **Two font groups** — Standard (8 parametric fonts: 4 edgy + 4 curvy) and Fantasy (alien rune glyphs + checkerboard alternation). Single press cycles within the current group; double press switches between groups.
 - **Animated colon separator** — 19-step animation cycle with filled/empty lozenge characters (ROM 0x96/0x97)
 - **Horizontal pixel-wear shifting** — the clock periodically shifts position across the display to distribute phosphor wear
 - **Auto-dimming** — brightness adjusts automatically based on sunrise/sunset times, calculated from GPS coordinates stored in EEPROM
@@ -36,7 +36,7 @@ Eight built-in font styles. The first seven are parametrically generated from st
 
 Based on the edgy_h3v4 font. The original tiles are split into two complementary sub-fonts using a checkerboard pixel mask: phase A keeps pixels where (row+col) is even, phase B keeps the complement. The two phases alternate following the same timing sequence as the separator animation — a long pause (~2.4 s) then a burst of rapid flips (50–168 ms each), 15 cycles per minute.
 
-Activated via triple-press or serial command `c`. Any single/double press exits back to the normal font carousel.
+Part of the Fantasy font group (accessible via double-press). Serial command `c` also toggles it.
 
 Phase A | Phase B (together they reconstruct the original):
 
