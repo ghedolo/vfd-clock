@@ -472,6 +472,15 @@ int   colonCycle = 0;        // separator cycle counter within current minute
 #define CYCLES_PER_MIN 15    // 15 cycles × 4s = 60s
 int   colOffset = 0;         // horizontal shift (-3..+4), changes every minute
 
+// ── Checkerboard alternation mode ────────────────────────────────────────────
+bool  checkerMode = false;          // checkerboard alternation active
+bool  checkerPhaseB = false;        // false = sub-font A, true = sub-font B
+unsigned long lastCheckerFlip = 0;  // timer for alternation
+unsigned long lastCheckerRTC  = 0;  // throttle RTC reads
+int   checkerStep = 0;              // current step in colonDur sequence
+int   checkerCycle = 0;             // cycle counter within current minute
+#define CHECKER_BASE_FONT 3         // edgy_h3v4
+
 // Serial buffer (32 chars for GPS coordinates)
 char serialBuf[32];
 int  serialIdx = 0;
@@ -542,10 +551,31 @@ unsigned long breathStart = 0;
 // ── Display functions ────────────────────────────────────────────────────────
 
 // Helper: read byte from current font's DIGITS matrix in PROGMEM
-inline byte dg(int d, int i) { return pgm_read_byte(&FONTS[currentFont].digits[d][i]); }
+// In checker mode, digits 1 and 7 use tile 1 (flip(A)) instead of ROM 0x15
+// for the bottom-right cell, so the checkerboard mask applies uniformly.
+inline byte dg(int d, int i) {
+  byte v = pgm_read_byte(&FONTS[currentFont].digits[d][i]);
+  if (checkerMode && v == 0x15 && i == 3) v = 1;  // BR cell: CGRAM tile instead of ROM
+  return v;
+}
+
+// Load checkerboard-masked tiles into CGRAM (phase A or B)
+void loadFontCheckerboard(bool phaseB) {
+  byte tmp[8];
+  for (int t = 0; t < 8; t++) {
+    memcpy_P(tmp, FONTS[CHECKER_BASE_FONT].tiles[t], 8);
+    for (int r = 0; r < 8; r++) {
+      byte maskEven = phaseB ? 0x0A : 0x15;  // even rows: 10101 or 01010
+      byte maskOdd  = phaseB ? 0x15 : 0x0A;  // odd rows:  01010 or 10101
+      tmp[r] &= (r & 1) ? maskOdd : maskEven;
+    }
+    lcd.createChar(t, tmp);
+  }
+}
 
 // Load current font tiles into CGRAM
 void loadFont() {
+  if (checkerMode) { loadFontCheckerboard(checkerPhaseB); return; }
   byte tmp[8];
   for (int t = 0; t < 8; t++) {
     memcpy_P(tmp, FONTS[currentFont].tiles[t], 8);
@@ -601,10 +631,14 @@ byte alienSep(byte ch) {
 
 void drawColon() {
   int cc = COL_COLON + colOffset;
-  if (cc >= 0 && cc <= 19) {
-    lcd.setCursor(cc, 0); lcd.write(alienSep(pgm_read_byte(&colonAnim[colonPhase][0])));
-    lcd.setCursor(cc, 1); lcd.write(alienSep(pgm_read_byte(&colonAnim[colonPhase][1])));
+  if (cc < 0 || cc > 19) return;
+  if (checkerMode) {
+    lcd.setCursor(cc, 0); lcd.write((byte)0x96);
+    lcd.setCursor(cc, 1); lcd.write((byte)0x96);
+    return;
   }
+  lcd.setCursor(cc, 0); lcd.write(alienSep(pgm_read_byte(&colonAnim[colonPhase][0])));
+  lcd.setCursor(cc, 1); lcd.write(alienSep(pgm_read_byte(&colonAnim[colonPhase][1])));
 }
 
 // ── Primitive helpers (with bounds check) ────────────────────────────────────
@@ -1005,6 +1039,24 @@ void handleSerialChar(char c) {
   // Brightness: 0=off, 1=25%, 2=50%, 3=75%, 4=100%, 9=auto
   if (c >= '0' && c <= '4') { brManualOverride = true; setBrightness(c - '0'); return; }
   if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
+  // Toggle checkerboard mode
+  if (c == 'c') {
+    checkerMode = !checkerMode;
+    if (checkerMode) {
+      currentFont = CHECKER_BASE_FONT;
+      checkerPhaseB = false;
+      checkerStep = 0;
+      checkerCycle = 0;
+      lastCheckerFlip = millis();
+      loadFontCheckerboard(false);
+      Serial.println(F("Checker ON"));
+    } else {
+      loadFont();
+      Serial.println(F("Checker OFF"));
+    }
+    if (clockRunning) redrawAll(); else drawWaiting();
+    return;
+  }
   // Replay boot animation
   if (c == 'i') {
     brSilent = true;
@@ -1285,6 +1337,7 @@ void bootAnimationReverse() {
 // ── Button: single intro + next font ────────────────────────────────────────
 
 void switchToFont(byte idx) {
+  checkerMode = false;
   currentFont = idx;
   char buf[16];
   strcpy_P(buf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
@@ -1466,7 +1519,38 @@ void loop() {
           }
         }
       }
+      // Triple press detection
+      bool trpl = false;
       if (dbl) {
+        unsigned long rel2 = millis();
+        while (millis() - rel2 < DOUBLE_PRESS_MS) {
+          updateBreathing();
+          if (digitalRead(BTN_PIN) == LOW) {
+            delay(50);
+            if (digitalRead(BTN_PIN) == LOW) {
+              trpl = true;
+              while (digitalRead(BTN_PIN) == LOW) { updateBreathing(); }
+              break;
+            }
+          }
+        }
+      }
+      if (trpl) {
+        checkerMode = !checkerMode;
+        if (checkerMode) {
+          currentFont = CHECKER_BASE_FONT;
+          checkerPhaseB = false;
+          checkerStep = 0;
+          checkerCycle = 0;
+          lastCheckerFlip = millis();
+          loadFontCheckerboard(false);
+          Serial.println(F("Checker ON"));
+        } else {
+          loadFont();
+          Serial.println(F("Checker OFF"));
+        }
+        if (clockRunning) redrawAll(); else drawWaiting();
+      } else if (dbl) {
         switchToFont(ALIEN_FONT_IDX);
       } else {
         buttonAction();
@@ -1494,7 +1578,52 @@ void loop() {
     }
   }
 
-  // Separator animation (independent timer, variable duration per step)
+  // ── Checkerboard alternation mode ──────────────────────────────────────────
+  // Follows the same timing sequence as the separator animation (colonDur[]),
+  // flipping between sub-font A and B on each step.
+  if (checkerMode) {
+    unsigned int curDur = pgm_read_word(&colonDur[checkerStep]);
+    if (now - lastCheckerFlip >= curDur) {
+      lastCheckerFlip += curDur;
+      checkerStep = (checkerStep + 1) % COLON_FRAMES;
+      checkerPhaseB = !checkerPhaseB;
+      loadFontCheckerboard(checkerPhaseB);
+      redrawAll();
+      // End of a full cycle?
+      if (checkerStep == 0) {
+        checkerCycle++;
+        if (checkerCycle >= CYCLES_PER_MIN) {
+          checkerCycle = 0;
+          lastCheckerFlip = millis();
+          if (rtcOk) {
+            DateTime utcNow = rtc.now();
+            int lh, lm;
+            utcToLocal(utcNow, lh, lm);
+            int ds = (int)utcNow.second();
+            if (ds > 30) ds -= 60;
+            if (ds > 0) {
+              unsigned long back = min((unsigned long)ds * 1000UL, 2000UL);
+              lastCheckerFlip -= back;
+            } else if (ds < 0) {
+              unsigned long fwd = min((unsigned long)(-ds) * 1000UL, 2000UL);
+              lastCheckerFlip += fwd;
+            }
+            hh = lh; mm = lm;
+          } else {
+            if (++mm >= 60) { mm = 0; if (++hh >= 24) hh = 0; }
+          }
+          clickMinute();
+          updateSunTimes();
+          applyAutoBrightness();
+          updateOffset();
+          redrawAll();
+        }
+      }
+    }
+    return;
+  }
+
+  // ── Separator animation (independent timer, variable duration per step) ────
   unsigned int curDur = pgm_read_word(&colonDur[colonPhase]);
   if (now - lastColon >= curDur) {
     lastColon += curDur;

@@ -6,7 +6,7 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Features
 
-- **7+1 switchable big-font styles** — 3 edgy + 4 curvy variants, each digit spans 2 rows x 2 character cells using 8 custom CGRAM tiles. Button press cycles through the 7 parametric fonts; double-press activates the hidden alien font.
+- **7+1+1 switchable big-font styles** — 3 edgy + 4 curvy variants, each digit spans 2 rows x 2 character cells using 8 custom CGRAM tiles. Button press cycles through the 7 parametric fonts; double-press activates the hidden alien font; triple-press activates checkerboard mode.
 - **Animated colon separator** — 19-step animation cycle with filled/empty lozenge characters (ROM 0x96/0x97)
 - **Horizontal pixel-wear shifting** — the clock periodically shifts position across the display to distribute phosphor wear
 - **Auto-dimming** — brightness adjusts automatically based on sunrise/sunset times, calculated from GPS coordinates stored in EEPROM
@@ -31,6 +31,17 @@ Eight built-in font styles. The first seven are parametrically generated from st
 | curvy_h2v2 | Rounded corners | 2 rows | 2 cols |
 | curvy_h3v2 | Rounded corners | 3 rows | 2 cols |
 | alien | Diagonal rune glyphs | — | — |
+
+### Checkerboard mode
+
+Based on the edgy_h3v4 font. The original tiles are split into two complementary sub-fonts using a checkerboard pixel mask: phase A keeps pixels where (row+col) is even, phase B keeps the complement. The two phases alternate following the same timing sequence as the separator animation — a long pause (~2.4 s) then a burst of rapid flips (50–168 ms each), 15 cycles per minute.
+
+Activated via triple-press or serial command `c`. Any single/double press exits back to the normal font carousel.
+
+Phase A | Phase B (together they reconstruct the original):
+
+![Phase A](../graphics/edgy_h3v4/chess/phase_A/digits/digits_all.png)
+![Phase B](../graphics/edgy_h3v4/chess/phase_B/digits/digits_all.png)
 
 Preview (edgy_h2v3, default):
 
@@ -73,6 +84,7 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 | `9` | Auto-dimming (sunrise/sunset) |
 | `p:lat,lon` | Set GPS position (e.g. `p:41.9028,12.4964`) |
 | `v` | CR2032 battery voltage |
+| `c` | Toggle checkerboard mode |
 | `i` | Replay boot animation |
 | `r` | Software reset |
 
