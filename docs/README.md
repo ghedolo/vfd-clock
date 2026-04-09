@@ -47,6 +47,16 @@ Preview (edgy_h2v3, default):
 
 ![Time Preview](../graphics/edgy_h2v3/digits/time_13_24.png)
 
+## Button
+
+| Press | Action |
+|---|---|
+| Single | Next font in current group |
+| Double | Switch group (Standard ↔ Fantasy) |
+
+- **Standard group** — 8 parametric fonts (edgy_h2v3, edgy_h3v3, edgy_h2v2, edgy_h3v4, curvy_h2v3, curvy_h3v3, curvy_h2v2, curvy_h3v2)
+- **Fantasy group** — alien + checkerboard (single press alternates between them)
+
 ## Wiring
 
 | Connection | Arduino Nano Pin |
