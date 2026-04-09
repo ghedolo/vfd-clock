@@ -854,11 +854,6 @@ void setBrightness(int level) {
   } else {
     lcd.command(0x0C);
     lcd.command(0x28 | pgm_read_byte(&brMap[level]));
-    if (!brSilent) {
-      Serial.print(F("Brightness: "));
-      Serial.print(level * 25);
-      Serial.println(F("%"));
-    }
   }
 }
 
@@ -1343,7 +1338,7 @@ void switchToFont(byte idx) {
   char buf[16];
   strcpy_P(buf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
   Serial.print(F("Font: "));
-  Serial.println(buf);
+  Serial.print(buf);
 
   brSilent = true;
   animSpeed = 2;
@@ -1353,6 +1348,9 @@ void switchToFont(byte idx) {
 
   loadFont();
   applyAutoBrightness(true);
+  Serial.print(F(" Brightness: "));
+  Serial.print(curBrLevel * 25);
+  Serial.println(F("%"));
   if (clockRunning) redrawAll();
   else drawWaiting();
 }
@@ -1365,7 +1363,9 @@ void activateChecker() {
   checkerCycle = 0;
   lastCheckerFlip = millis();
   loadFontCheckerboard(false);
-  Serial.println(F("Checker ON"));
+  Serial.print(F("Font: checker Brightness: "));
+  Serial.print(curBrLevel * 25);
+  Serial.println(F("%"));
   if (clockRunning) redrawAll(); else drawWaiting();
 }
 
