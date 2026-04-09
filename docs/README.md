@@ -36,7 +36,7 @@ Eight built-in font styles. The first seven are parametrically generated from st
 
 Based on the edgy_h3v4 font. The original tiles are split into two complementary sub-fonts using a checkerboard pixel mask: phase A keeps pixels where (row+col) is even, phase B keeps the complement. The two phases alternate following the same timing sequence as the separator animation — a long pause (~2.4 s) then a burst of rapid flips (50–168 ms each), 15 cycles per minute.
 
-Part of the Fantasy font group (accessible via double-press). Serial command `c` also toggles it.
+Part of the Fantasy font group (accessible via double-press).
 
 Phase A | Phase B (together they reconstruct the original):
 
@@ -94,7 +94,6 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 | `9` | Auto-dimming (sunrise/sunset) |
 | `p:lat,lon` | Set GPS position (e.g. `p:41.9028,12.4964`) |
 | `v` | CR2032 battery voltage |
-| `c` | Toggle checkerboard mode |
 | `i` | Replay boot animation |
 | `r` | Software reset |
 

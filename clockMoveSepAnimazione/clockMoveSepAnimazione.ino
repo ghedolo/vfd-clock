@@ -1036,20 +1036,6 @@ void handleSerialChar(char c) {
   // Brightness: 0=off, 1=25%, 2=50%, 3=75%, 4=100%, 9=auto
   if (c >= '0' && c <= '4') { brManualOverride = true; setBrightness(c - '0'); return; }
   if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
-  // Toggle checkerboard mode
-  if (c == 'c') {
-    if (checkerMode) {
-      checkerMode = false;
-      fantasyGroup = true;
-      fantasyIdx = 0;
-      switchToFont(ALIEN_FONT_IDX);
-    } else {
-      fantasyGroup = true;
-      fantasyIdx = 1;
-      activateChecker();
-    }
-    return;
-  }
   // Replay boot animation
   if (c == 'i') {
     brSilent = true;
