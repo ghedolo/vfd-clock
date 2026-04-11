@@ -6,7 +6,7 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Features
 
-- **Two font groups** — Standard (8 parametric fonts: 4 edgy + 4 curvy) and Fantasy (alien rune glyphs + checkerboard alternation). Single press cycles within the current group; double press switches between groups.
+- **Two font groups** — Standard (8 parametric fonts: 4 edgy + 4 curvy) and Fantasy (alien + three two-phase mask variants: checker, vbars, diag). Single press cycles within the current group; double press switches between groups.
 - **Animated colon separator** — 19-step animation cycle with filled/empty lozenge characters (ROM 0x96/0x97)
 - **Horizontal pixel-wear shifting** — the clock periodically shifts position across the display to distribute phosphor wear
 - **Auto-dimming** — brightness adjusts automatically based on sunrise/sunset times, calculated from GPS coordinates stored in EEPROM
@@ -32,16 +32,34 @@ Eight built-in font styles. The first seven are parametrically generated from st
 | curvy_h3v2 | Rounded corners | 3 rows | 2 cols |
 | alien | Diagonal rune glyphs | — | — |
 
-### Checkerboard mode
+### Two-phase mask modes
 
-Based on the edgy_h3v4 font. The original tiles are split into two complementary sub-fonts using a checkerboard pixel mask: phase A keeps pixels where (row+col) is even, phase B keeps the complement. The two phases alternate following the same timing sequence as the separator animation — a long pause (~2.4 s) then a burst of rapid flips (50–168 ms each), 15 cycles per minute.
+Three variants (checker, vbars, diag) derive two sub-fonts from the
+edgy_h3v4 tiles by masking pixels, then flip between phases A and B on
+each separator step — a long pause (~2.4 s) followed by a burst of rapid
+flips (50–242 ms each), 15 cycles per minute. All share the same engine:
+a `maskRow(type, r, phaseB)` helper returns the 5-bit row mask for each
+variant, and the CGRAM is reloaded on every flip.
 
-Part of the Fantasy font group (accessible via double-press).
+Part of the Fantasy font group (cycle: alien → checker → vbars → diag).
 
-Phase A | Phase B (together they reconstruct the original):
+**Checker** — phase A keeps pixels where (row+col) is even, phase B keeps
+the complement. Together the two phases reconstruct the original glyph.
 
-![Phase A](../graphics/edgy_h3v4/chess/phase_A/digits/digits_all.png)
-![Phase B](../graphics/edgy_h3v4/chess/phase_B/digits/digits_all.png)
+![checker A](../graphics/edgy_h3v4/chess/phase_A/digits/digits_all.png)
+![checker B](../graphics/edgy_h3v4/chess/phase_B/digits/digits_all.png)
+
+**Vbars** — vertical stripes: phase A keeps columns 0/2/4, phase B keeps
+columns 1/3.
+
+![vbars A](../graphics/edgy_h3v4/vbars/phase_A/digits/digits_all.png)
+![vbars B](../graphics/edgy_h3v4/vbars/phase_B/digits/digits_all.png)
+
+**Diag** — period-3 diagonal hatch on (row+col). Each phase keeps ~2/3 of
+the pixels with one missing diagonal line; flipping A↔B shifts the gap.
+
+![diag A](../graphics/edgy_h3v4/diag/phase_A/digits/digits_all.png)
+![diag B](../graphics/edgy_h3v4/diag/phase_B/digits/digits_all.png)
 
 Preview (edgy_h2v3, default):
 
@@ -54,8 +72,8 @@ Preview (edgy_h2v3, default):
 | Single | Next font in current group |
 | Double | Switch group (Standard ↔ Fantasy) |
 
-- **Standard group** — 8 parametric fonts (edgy_h2v3, edgy_h3v3, edgy_h2v2, edgy_h3v4, curvy_h2v3, curvy_h3v3, curvy_h2v2, curvy_h3v2)
-- **Fantasy group** — alien + checkerboard (single press alternates between them)
+- **Standard group** — 8 parametric fonts (edgy_h2v3, edgy_h3v3, edgy_h2v2, edgy_h3v4, curvy_h2v3, curvy_h3v3, curvy_h2v2, curvy_h3v2). A curtain-style boot animation replays on each cycle within this group.
+- **Fantasy group** — alien + three two-phase masks (checker, vbars, diag). Single press cycles alien → checker → vbars → diag → alien. No boot animation on these transitions.
 
 ## Wiring
 
@@ -95,6 +113,8 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 | `p:lat,lon` | Set GPS position (e.g. `p:41.9028,12.4964`) |
 | `v` | CR2032 battery voltage |
 | `i` | Replay boot animation |
+| `t` | Next font in current group (single button press) |
+| `T` | Switch font group (double button press) |
 | `r` | Software reset |
 
 ## Hardware

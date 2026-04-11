@@ -453,8 +453,8 @@ const char FN8[] PROGMEM = "alien";
 const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8 };
 
 byte currentFont = 0;
-bool fantasyGroup = false;        // false = standard (0-7), true = fantasy (alien + checker)
-byte fantasyIdx = 0;              // 0 = alien, 1 = checker
+bool fantasyGroup = false;        // false = standard (0-7), true = fantasy
+byte fantasyIdx = 0;              // 0=alien, 1=checker, 2=vbars, 3=diag
 
 // ── Column positions ─────────────────────────────────────────────────────────
 const int COL_H1    =  3;
@@ -474,14 +474,20 @@ int   colonCycle = 0;        // separator cycle counter within current minute
 #define CYCLES_PER_MIN 15    // 15 cycles × 4s = 60s
 int   colOffset = 0;         // horizontal shift (-3..+4), changes every minute
 
-// ── Checkerboard alternation mode ────────────────────────────────────────────
-bool  checkerMode = false;          // checkerboard alternation active
-bool  checkerPhaseB = false;        // false = sub-font A, true = sub-font B
-unsigned long lastCheckerFlip = 0;  // timer for alternation
-unsigned long lastCheckerRTC  = 0;  // throttle RTC reads
-int   checkerStep = 0;              // current step in colonDur sequence
-int   checkerCycle = 0;             // cycle counter within current minute
-#define CHECKER_BASE_FONT 3         // edgy_h3v4
+// ── Pixel-mask alternation modes ─────────────────────────────────────────────
+// Three variants share the same alternation engine: checkerboard, vertical
+// stripes, horizontal stripes. All derive two sub-fonts from edgy_h3v4 by
+// masking tile pixels, and flip between them on each colonDur step.
+#define MASK_NONE    0
+#define MASK_CHECKER 1
+#define MASK_VBARS   2
+#define MASK_DIAG    3
+byte  maskMode = MASK_NONE;         // active mask type (MASK_NONE = disabled)
+bool  maskPhaseB = false;           // false = sub-font A, true = sub-font B
+unsigned long lastMaskFlip = 0;     // timer for alternation
+int   maskStep = 0;                 // current step in colonDur sequence
+int   maskCycle = 0;                // cycle counter within current minute
+#define MASK_BASE_FONT 3            // edgy_h3v4
 
 // Serial buffer (32 chars for GPS coordinates)
 char serialBuf[32];
@@ -556,31 +562,50 @@ volatile byte breathDuty = 0;  // 0..255, updated by updateBreathing()
 // ── Display functions ────────────────────────────────────────────────────────
 
 // Helper: read byte from current font's DIGITS matrix in PROGMEM
-// In checker mode, digits 1 and 7 use tile 1 (flip(A)) instead of ROM 0x15
-// for the bottom-right cell, so the checkerboard mask applies uniformly.
+// In any mask mode, digits 1 and 7 use tile 1 (flip(A)) instead of ROM 0x15
+// for the bottom-right cell, so the mask pattern applies uniformly.
 inline byte dg(int d, int i) {
   byte v = pgm_read_byte(&FONTS[currentFont].digits[d][i]);
-  if (checkerMode && v == 0x15 && i == 3) v = 1;  // BR cell: CGRAM tile instead of ROM
+  if (maskMode != MASK_NONE && v == 0x15 && i == 3) v = 1;  // BR cell: CGRAM tile
   return v;
 }
 
-// Load checkerboard-masked tiles into CGRAM (phase A or B)
-void loadFontCheckerboard(bool phaseB) {
+// Compute the 5-bit pixel mask for row `r` of mask `type`, phase `phaseB`.
+//   CHECKER: alternates 0x15/0x0A by (row ^ phase) parity
+//   VBARS:   all rows 0x15 (A) or 0x0A (B) — kept columns 0,2,4 vs 1,3
+//   DIAG:    diagonal hatch with period 3 along (row+col); each phase
+//            removes one diagonal line, the line shifts between A and B.
+//            Rows cycle through [0x0D, 0x1B, 0x16]; phase B shifts +1.
+static inline byte maskRow(byte type, byte r, bool phaseB) {
+  switch (type) {
+    case MASK_CHECKER: {
+      byte me = phaseB ? 0x0A : 0x15;
+      byte mo = phaseB ? 0x15 : 0x0A;
+      return (r & 1) ? mo : me;
+    }
+    case MASK_VBARS:
+      return phaseB ? 0x0A : 0x15;
+    case MASK_DIAG: {
+      byte k = (r + (phaseB ? 2 : 0)) % 3;
+      return (k == 0) ? 0x0D : ((k == 1) ? 0x1B : 0x16);
+    }
+  }
+  return 0x1F;
+}
+
+// Load masked tiles into CGRAM (phase A or B) for the given mask type.
+void loadMaskedFont(byte type, bool phaseB) {
   byte tmp[8];
   for (int t = 0; t < 8; t++) {
-    memcpy_P(tmp, FONTS[CHECKER_BASE_FONT].tiles[t], 8);
-    for (int r = 0; r < 8; r++) {
-      byte maskEven = phaseB ? 0x0A : 0x15;  // even rows: 10101 or 01010
-      byte maskOdd  = phaseB ? 0x15 : 0x0A;  // odd rows:  01010 or 10101
-      tmp[r] &= (r & 1) ? maskOdd : maskEven;
-    }
+    memcpy_P(tmp, FONTS[MASK_BASE_FONT].tiles[t], 8);
+    for (int r = 0; r < 8; r++) tmp[r] &= maskRow(type, r, phaseB);
     lcd.createChar(t, tmp);
   }
 }
 
 // Load current font tiles into CGRAM
 void loadFont() {
-  if (checkerMode) { loadFontCheckerboard(checkerPhaseB); return; }
+  if (maskMode != MASK_NONE) { loadMaskedFont(maskMode, maskPhaseB); return; }
   byte tmp[8];
   for (int t = 0; t < 8; t++) {
     memcpy_P(tmp, FONTS[currentFont].tiles[t], 8);
@@ -637,7 +662,7 @@ byte alienSep(byte ch) {
 void drawColon() {
   int cc = COL_COLON + colOffset;
   if (cc < 0 || cc > 19) return;
-  if (checkerMode) {
+  if (maskMode != MASK_NONE) {
     lcd.setCursor(cc, 0); lcd.write((byte)0x96);
     lcd.setCursor(cc, 1); lcd.write((byte)0x96);
     return;
@@ -1053,6 +1078,9 @@ void handleSerialChar(char c) {
   if (c == 'h' && clockRunning) { adjustMinutes(-60); return; }
   if (c == 'D' && clockRunning) { adjustMinutes(10);  return; }
   if (c == 'd' && clockRunning) { adjustMinutes(-10); return; }
+  // Button emulation: t = single press (cycle font), T = double press (switch group)
+  if (c == 't') { nextInGroup(); return; }
+  if (c == 'T') { switchGroup();  return; }
   // Brightness: 0=off, 1=25%, 2=50%, 3=75%, 4=100%, 9=auto
   if (c >= '0' && c <= '4') { brManualOverride = true; setBrightness(c - '0'); return; }
   if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
@@ -1338,38 +1366,88 @@ void bootAnimationReverse() {
 #define DOUBLE_PRESS_MS 500
 #define STD_FONT_COUNT  (ALIEN_FONT_IDX)  // fonts 0..(ALIEN-1) are standard
 
-void switchToFont(byte idx) {
-  checkerMode = false;
+// Seed the (last, phase, cycle) triple of an animation that follows the
+// colonDur[] timing so the next minute-rollover fires exactly at RTC second 0.
+// Without this alignment, a reset of (last=millis, phase=0, cycle=0) at an
+// arbitrary RTC second S would place the first rollover 60s later, at the
+// same second S, producing an initial delta of up to ±30s that then has to
+// converge slowly via the ±2s/minute correction clamp — visible in the
+// serial log as a delta: -24 → 0 (or similar) sequence over several minutes.
+void alignToRTC(unsigned long &lastRef, int &phaseRef, int &cycleRef) {
+  if (!rtcOk) {
+    lastRef = millis();
+    phaseRef = 0;
+    cycleRef = 0;
+    return;
+  }
+  byte s = rtc.now().second();
+  unsigned long msIntoMinute = (unsigned long)s * 1000UL;
+  unsigned long cyc = msIntoMinute / 4000UL;            // 0..14
+  unsigned long rem = msIntoMinute - cyc * 4000UL;      // 0..3999
+  cycleRef = (int)cyc;
+  // Find the phase that contains `rem` and how many ms we are into it.
+  unsigned long cum = 0;
+  int ph = 0;
+  for (int i = 0; i < COLON_FRAMES; i++) {
+    unsigned int d = pgm_read_word(&colonDur[i]);
+    if (rem < cum + d) { ph = i; break; }
+    cum += d;
+  }
+  phaseRef = ph;
+  // Seed lastRef so we are (rem - cum) ms into frame `ph` right now.
+  lastRef = millis() - (rem - cum);
+}
+
+// Switch to a regular font. The curtain-style bootAnimation runs only when
+// `animate` is true — reserved for cycling within the standard (parametric)
+// group. Group switches and fantasy transitions pass animate=false.
+// Also re-seeds the separator timer against the RTC, so the first rollover
+// after the transition fires at the next real minute boundary (delta ≈ 0).
+void switchToFont(byte idx, bool animate) {
+  maskMode = MASK_NONE;
   currentFont = idx;
   char buf[16];
   strcpy_P(buf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
   Serial.print(F("Font: "));
   Serial.print(buf);
 
-  brSilent = true;
-  animSpeed = 2;
-  bootAnimation();
-  animSpeed = 1;
-  brSilent = false;
+  if (animate) {
+    brSilent = true;
+    animSpeed = 2;
+    bootAnimation();
+    animSpeed = 1;
+    brSilent = false;
+  }
 
   loadFont();
   applyAutoBrightness(true);
   Serial.print(F(" Brightness: "));
   Serial.print(curBrLevel * 25);
   Serial.println(F("%"));
+
+  // Re-align separator-animation state to the RTC so the next rollover
+  // fires at real second 0 (avoids the slow delta convergence that would
+  // otherwise follow a plain reset at an arbitrary button-press instant).
+  alignToRTC(lastColon, colonPhase, colonCycle);
+
   if (clockRunning) redrawAll();
   else drawWaiting();
 }
 
-void activateChecker() {
-  checkerMode = true;
-  currentFont = CHECKER_BASE_FONT;
-  checkerPhaseB = false;
-  checkerStep = 0;
-  checkerCycle = 0;
-  lastCheckerFlip = millis();
-  loadFontCheckerboard(false);
-  Serial.print(F("Font: checker Brightness: "));
+void activateMask(byte type) {
+  maskMode = type;
+  currentFont = MASK_BASE_FONT;
+  maskPhaseB = false;
+  alignToRTC(lastMaskFlip, maskStep, maskCycle);
+  loadMaskedFont(type, false);
+  Serial.print(F("Font: "));
+  switch (type) {
+    case MASK_CHECKER: Serial.print(F("checker")); break;
+    case MASK_VBARS:   Serial.print(F("vbars"));   break;
+    case MASK_DIAG:    Serial.print(F("diag"));    break;
+    default:           Serial.print(F("mask"));    break;
+  }
+  Serial.print(F(" Brightness: "));
   Serial.print(curBrLevel * 25);
   Serial.println(F("%"));
   if (clockRunning) redrawAll(); else drawWaiting();
@@ -1377,27 +1455,30 @@ void activateChecker() {
 
 void nextInGroup() {
   if (!fantasyGroup) {
-    // Standard: cycle 0..(STD_FONT_COUNT-1)
+    // Standard: cycle 0..(STD_FONT_COUNT-1) — this is the only case that
+    // replays the curtain bootAnimation (power-on style flourish).
     byte next = (currentFont + 1) % STD_FONT_COUNT;
-    switchToFont(next);
+    switchToFont(next, true);
   } else {
-    // Fantasy: toggle between alien and checker
-    fantasyIdx = 1 - fantasyIdx;
-    if (fantasyIdx == 0) {
-      switchToFont(ALIEN_FONT_IDX);
-    } else {
-      activateChecker();
+    // Fantasy: cycle alien → checker → vbars → diag → alien …  No curtain.
+    fantasyIdx = (fantasyIdx + 1) & 0x03;
+    switch (fantasyIdx) {
+      case 0: switchToFont(ALIEN_FONT_IDX, false); break;
+      case 1: activateMask(MASK_CHECKER);          break;
+      case 2: activateMask(MASK_VBARS);            break;
+      case 3: activateMask(MASK_DIAG);             break;
     }
   }
 }
 
 void switchGroup() {
+  // Group switches never replay the curtain animation.
   fantasyGroup = !fantasyGroup;
   if (fantasyGroup) {
     fantasyIdx = 0;
-    switchToFont(ALIEN_FONT_IDX);
+    switchToFont(ALIEN_FONT_IDX, false);
   } else {
-    switchToFont(0);
+    switchToFont(0, false);
   }
 }
 
@@ -1441,6 +1522,8 @@ void setup() {
   Serial.println(F("  v                  CR2032 battery voltage"));
   Serial.println(F("  o                  Overall status (one line)"));
   Serial.println(F("  i                  Replay boot animation"));
+  Serial.println(F("  t                  Next font in group (single button press)"));
+  Serial.println(F("  T                  Switch font group  (double button press)"));
   Serial.println(F("  r                  Software reset"));
   Serial.println();
 
@@ -1585,35 +1668,38 @@ void loop() {
     }
   }
 
-  // ── Checkerboard alternation mode ──────────────────────────────────────────
+  // ── Mask alternation mode (checker / vbars / diag) ─────────────────────────
   // Follows the same timing sequence as the separator animation (colonDur[]),
   // flipping between sub-font A and B on each step.
-  if (checkerMode) {
-    unsigned int curDur = pgm_read_word(&colonDur[checkerStep]);
-    if (now - lastCheckerFlip >= curDur) {
-      lastCheckerFlip += curDur;
-      checkerStep = (checkerStep + 1) % COLON_FRAMES;
-      checkerPhaseB = !checkerPhaseB;
-      loadFontCheckerboard(checkerPhaseB);
+  if (maskMode != MASK_NONE) {
+    unsigned int curDur = pgm_read_word(&colonDur[maskStep]);
+    if (now - lastMaskFlip >= curDur) {
+      lastMaskFlip += curDur;
+      maskStep = (maskStep + 1) % COLON_FRAMES;
+      maskPhaseB = !maskPhaseB;
+      loadMaskedFont(maskMode, maskPhaseB);
       redrawAll();
       // End of a full cycle?
-      if (checkerStep == 0) {
-        checkerCycle++;
-        if (checkerCycle >= CYCLES_PER_MIN) {
-          checkerCycle = 0;
-          lastCheckerFlip = millis();
+      if (maskStep == 0) {
+        maskCycle++;
+        if (maskCycle >= CYCLES_PER_MIN) {
+          maskCycle = 0;
+          lastMaskFlip = millis();
           if (rtcOk) {
             DateTime utcNow = rtc.now();
             int lh, lm;
             utcToLocal(utcNow, lh, lm);
             int ds = (int)utcNow.second();
             if (ds > 30) ds -= 60;
+            Serial.print(F("delta: "));
+            Serial.print(ds);
+            Serial.println(F(" s"));
             if (ds > 0) {
               unsigned long back = min((unsigned long)ds * 1000UL, 2000UL);
-              lastCheckerFlip -= back;
+              lastMaskFlip -= back;
             } else if (ds < 0) {
               unsigned long fwd = min((unsigned long)(-ds) * 1000UL, 2000UL);
-              lastCheckerFlip += fwd;
+              lastMaskFlip += fwd;
             }
             hh = lh; mm = lm;
           } else {
