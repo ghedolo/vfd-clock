@@ -63,7 +63,7 @@ the pixels with one missing diagonal line; flipping A↔B shifts the gap.
 
 Preview (edgy_h2v3, default):
 
-![Time Preview](../graphics/edgy_h2v3/digits/time_13_24.png)
+![Digits preview](../graphics/edgy_h2v3/digits/digits_all.png)
 
 ## Button
 
