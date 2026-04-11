@@ -147,3 +147,28 @@ The following datasheets are included in this directory for reference only. All 
 ghedo (luca.ghedini@gmail.com) — 2026
 
 Built with [Claude Code](https://claude.ai/claude-code) by Anthropic.
+
+## Development effort
+
+This project was built entirely through a conversation with Claude Code. The numbers below are extracted from the local session transcripts (`~/.claude/projects/.../char1/*.jsonl`) and from the git history.
+
+- **First message:** 2026-03-22 18:16 UTC
+- **Last message:** 2026-04-11 08:58 UTC
+- **Calendar span:** ~20 days, 28 commits across 17 sessions, 5651 messages (2478 user + 3173 assistant)
+- **Active conversation time: ~858 minutes (~14.3 hours)**
+
+*How active time is computed:* every message in the transcripts carries a timestamp. The timestamps are sorted and the gap between each consecutive pair is measured. Only gaps shorter than or equal to 5 minutes are summed, the rest are discarded. The idea is to count the time when a conversation was actually in progress (including natural pauses for reading, compiling, flashing, checking the hardware) while ignoring long idle periods (overnight breaks, days off, switching to other work). The 5-minute threshold is a rough but reasonable compromise; raising or lowering it shifts the total accordingly.
+
+### Tokens
+
+Cumulative token counts across all 17 sessions:
+
+| Metric | Tokens |
+|---|---:|
+| Input (non-cache) | 8 449 |
+| Output | 866 080 |
+| Cache write | 5 681 071 |
+| Cache read | 242 680 342 |
+| **Total** | **~249 M** |
+
+Cache-read tokens dominate because every turn re-reads the existing context from the prompt cache (this is the standard accounting for cached prompts: the tokens are billed at a reduced rate but still counted). The "real" output produced by the model is ~866 k tokens; new context accumulated into the cache is ~5.7 M tokens.
