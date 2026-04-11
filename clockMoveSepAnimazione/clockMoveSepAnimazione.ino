@@ -538,13 +538,16 @@ void clickMinute() {
   }
 }
 
-// Breathing LED (pin 13, software PWM)
+// Breathing LED (pin 13, Timer2 ISR-driven software PWM)
+// PWM runs from a Timer2 compare-match interrupt so it keeps ticking
+// even when the main loop is blocked by LCD updates (e.g. font reload
+// + redrawAll() in checkerboard mode).
 #define BREATH_PIN      13
 #define BREATH_PERIOD   4000   // breath duration (rise+fall) in ms
 #define BREATH_PAUSE    3000   // pause between breaths in ms
 #define BREATH_TOTAL    (BREATH_PERIOD + BREATH_PAUSE)
-#define BREATH_PWM_US   10000  // software PWM period in microseconds
 unsigned long breathStart = 0;
+volatile byte breathDuty = 0;  // 0..255, updated by updateBreathing()
 
 // CR2032 battery voltage reading on A3
 #define BATT_PIN A3
@@ -769,31 +772,48 @@ void checkBatt() {
   }
 }
 
-// ── Breathing LED (software PWM on pin 13) ──────────────────────────────────
+// ── Breathing LED (Timer2 ISR-driven PWM on pin 13) ─────────────────────────
 
 // Direct port manipulation for pin 13 (PB5) — ~50× faster than digitalWrite
 #define BREATH_ON()   (PORTB |=  (1 << 5))
 #define BREATH_OFF()  (PORTB &= ~(1 << 5))
 
+// Timer2 CTC @ prescaler 8, OCR2A=63 → compare match every 32µs.
+// The ISR runs an 8-bit soft counter, giving a 32µs × 256 ≈ 8.2 ms PWM
+// period (~122 Hz). It stays regular during blocking LCD operations,
+// which is why checkerboard mode no longer makes the breath stutter.
+void setupBreathTimer() {
+  TCCR2A = (1 << WGM21);       // CTC mode
+  TCCR2B = (1 << CS21);        // prescaler /8
+  OCR2A  = 63;                 // 64 * 8 / 16MHz = 32 µs
+  TCNT2  = 0;
+  TIMSK2 = (1 << OCIE2A);      // enable compare-A interrupt
+}
+
+ISR(TIMER2_COMPA_vect) {
+  static byte cnt = 0;
+  byte d = breathDuty;
+  if (cnt < d) BREATH_ON(); else BREATH_OFF();
+  cnt++;
+}
+
 void updateBreathing() {
   unsigned long now = millis();
   unsigned long cycle = (now - breathStart) % BREATH_TOTAL;
 
-  // During pause: LED off
+  // During pause: LED fully off
   if (cycle >= BREATH_PERIOD) {
-    BREATH_OFF();
+    breathDuty = 0;
     return;
   }
 
-  // Cosine ramp: smooth ease-in and ease-out, no snap at peak
-  // Maps cycle 0→BREATH_PERIOD to brightness 0→255→0 via raised cosine
+  // Cosine ramp: smooth ease-in and ease-out, no snap at peak.
+  // Maps cycle 0→BREATH_PERIOD to duty 0→255→0 via raised cosine.
   float phase = (float)cycle / BREATH_PERIOD;          // 0.0 → 1.0
   int brightness = (int)(127.5 * (1.0 - cos(2.0 * M_PI * phase)));
-
-  // Software PWM: compare duty cycle with position in micro-cycle
-  unsigned long pwmPos = micros() % BREATH_PWM_US;
-  unsigned long onTime = (unsigned long)brightness * BREATH_PWM_US / 255;
-  if (pwmPos < onTime) BREATH_ON(); else BREATH_OFF();
+  if (brightness < 0) brightness = 0;
+  if (brightness > 255) brightness = 255;
+  breathDuty = (byte)brightness;
 }
 
 // ── Sync RTC with current local time ─────────────────────────────────────────
@@ -1402,6 +1422,7 @@ void setup() {
 
   pinMode(BREATH_PIN, OUTPUT);
   breathStart = millis();
+  setupBreathTimer();
 
   Serial.begin(9600);
   Serial.println(F("clockMoveSepAnimazione"));
