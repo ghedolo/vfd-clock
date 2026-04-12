@@ -6,7 +6,8 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Features
 
-- **Two font groups** — Standard (8 parametric fonts: 4 edgy + 4 curvy) and Fantasy (alien + three two-phase mask variants: checker, vbars, diag). Single press cycles within the current group; double press switches between groups.
+- **Two font groups** — Standard (10 fonts: 4 edgy + 4 curvy + chess_B + diag_B) and Fantasy (alien + vbars two-phase mask). Single press cycles within the current group; double press switches between groups.
+- **Leading zero suppression** — hours < 10 display without the leading zero (e.g. "9:05" instead of "09:05")
 - **Animated colon separator** — 19-step animation cycle with filled/empty lozenge characters (ROM 0x96/0x97)
 - **Horizontal pixel-wear shifting** — the clock periodically shifts position across the display to distribute phosphor wear
 - **Auto-dimming** — brightness adjusts automatically based on sunrise/sunset times, calculated from GPS coordinates stored in EEPROM
@@ -19,35 +20,31 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 
 ## Fonts
 
-Eight built-in font styles. The first seven are parametrically generated from stroke width (h = horizontal bar rows, v = vertical bar columns); the eighth is a hand-designed alien/runic font with diagonal strokes:
+Ten built-in font styles in the standard group. The first seven are parametrically generated from stroke width (h = horizontal bar rows, v = vertical bar columns); chess_B and diag_B are pre-baked single-phase masks derived from edgy_h3v4; alien is a hand-designed runic font with diagonal strokes:
 
 | Font | Style | Horizontal (h) | Vertical (v) |
 |---|---|---|---|
 | edgy_h2v3 | Sharp corners | 2 rows | 3 cols |
 | edgy_h3v3 | Sharp corners | 3 rows | 3 cols |
 | edgy_h2v2 | Sharp corners | 2 rows | 2 cols |
+| edgy_h3v4 | Sharp corners | 3 rows | 4 cols |
 | curvy_h2v3 | Rounded corners | 2 rows | 3 cols |
 | curvy_h3v3 | Rounded corners | 3 rows | 3 cols |
 | curvy_h2v2 | Rounded corners | 2 rows | 2 cols |
 | curvy_h3v2 | Rounded corners | 3 rows | 2 cols |
+| chess_B | Checkerboard phase B | — | — |
+| diag_B | Diagonal hatch phase B | — | — |
 | alien | Diagonal rune glyphs | — | — |
 
 ### Two-phase mask modes
 
-Three variants (checker, vbars, diag) derive two sub-fonts from the
-edgy_h3v4 tiles by masking pixels, then flip between phases A and B on
-each separator step — a long pause (~2.4 s) followed by a burst of rapid
-flips (50–242 ms each), 15 cycles per minute. All share the same engine:
-a `maskRow(type, r, phaseB)` helper returns the 5-bit row mask for each
-variant, and the CGRAM is reloaded on every flip.
+The vbars variant derives two sub-fonts from the edgy_h3v4 tiles by
+masking pixels, then flips between phases A and B on each separator
+step — a long pause (~2.4 s) followed by a burst of rapid flips
+(50–242 ms each), 15 cycles per minute. The `maskRow(type, r, phaseB)`
+helper returns the 5-bit row mask, and the CGRAM is reloaded on every flip.
 
-Part of the Fantasy font group (cycle: alien → checker → vbars → diag).
-
-**Checker** — phase A keeps pixels where (row+col) is even, phase B keeps
-the complement. Together the two phases reconstruct the original glyph.
-
-![checker A](../graphics/edgy_h3v4/chess/phase_A/digits/digits_all.png)
-![checker B](../graphics/edgy_h3v4/chess/phase_B/digits/digits_all.png)
+Part of the Fantasy font group (cycle: alien → vbars).
 
 **Vbars** — vertical stripes: phase A keeps columns 0/2/4, phase B keeps
 columns 1/3.
@@ -55,11 +52,12 @@ columns 1/3.
 ![vbars A](../graphics/edgy_h3v4/vbars/phase_A/digits/digits_all.png)
 ![vbars B](../graphics/edgy_h3v4/vbars/phase_B/digits/digits_all.png)
 
-**Diag** — period-3 diagonal hatch on (row+col). Each phase keeps ~2/3 of
-the pixels with one missing diagonal line; flipping A↔B shifts the gap.
+**chess_B** and **diag_B** — these were formerly two-phase mask variants
+(checker and diagonal hatch). Their phase B is now pre-baked as a static
+font in the standard group, so they display without runtime masking.
 
-![diag A](../graphics/edgy_h3v4/diag/phase_A/digits/digits_all.png)
-![diag B](../graphics/edgy_h3v4/diag/phase_B/digits/digits_all.png)
+![chess_B](../graphics/edgy_h3v4/chess/phase_B/digits/digits_all.png)
+![diag_B](../graphics/edgy_h3v4/diag/phase_B/digits/digits_all.png)
 
 Preview (edgy_h2v3, default):
 
@@ -72,8 +70,8 @@ Preview (edgy_h2v3, default):
 | Single | Next font in current group |
 | Double | Switch group (Standard ↔ Fantasy) |
 
-- **Standard group** — 8 parametric fonts (edgy_h2v3, edgy_h3v3, edgy_h2v2, edgy_h3v4, curvy_h2v3, curvy_h3v3, curvy_h2v2, curvy_h3v2). A curtain-style boot animation replays on each cycle within this group.
-- **Fantasy group** — alien + three two-phase masks (checker, vbars, diag). Single press cycles alien → checker → vbars → diag → alien. No boot animation on these transitions.
+- **Standard group** — 10 fonts (edgy_h2v3, edgy_h3v3, edgy_h2v2, edgy_h3v4, curvy_h2v3, curvy_h3v3, curvy_h2v2, curvy_h3v2, chess_B, diag_B). A curtain-style boot animation replays on each cycle within this group.
+- **Fantasy group** — alien + vbars two-phase mask. Single press cycles alien → vbars → alien. No boot animation on these transitions.
 
 ## Wiring
 

@@ -412,7 +412,57 @@ const Font FONTS[] PROGMEM = {
       { 6,    5,    7,    3    },  // 9
     }
   },
-  // Font 8: alien — diagonal strokes with dot accents (rune glyphs)
+  // Font 8: chess_B — checkerboard phase B (pre-baked from edgy_h3v4)
+  {
+    {
+      { 0x0A, 0x15, 0x0A, 0x14, 0x0A, 0x14, 0x0A, 0x14 }, // 0
+      { 0x0A, 0x15, 0x0A, 0x05, 0x0A, 0x05, 0x0A, 0x05 }, // 1
+      { 0x0A, 0x14, 0x0A, 0x14, 0x0A, 0x15, 0x0A, 0x15 }, // 2
+      { 0x0A, 0x05, 0x0A, 0x05, 0x0A, 0x15, 0x0A, 0x15 }, // 3
+      { 0x0A, 0x15, 0x0A, 0x00, 0x00, 0x15, 0x0A, 0x15 }, // 4
+      { 0x0A, 0x15, 0x0A, 0x05, 0x0A, 0x15, 0x0A, 0x15 }, // 5
+      { 0x0A, 0x15, 0x0A, 0x14, 0x0A, 0x15, 0x0A, 0x15 }, // 6
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x15, 0x0A, 0x15 }, // 7
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 1    },  // 1  (CGRAM tile 1 = masked BR)
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 1    },  // 7  (CGRAM tile 1 = masked BR)
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 9: diag_B — diagonal hatch phase B (pre-baked from edgy_h3v4)
+  {
+    {
+      { 0x16, 0x0D, 0x1B, 0x16, 0x0C, 0x1A, 0x16, 0x0C }, // 0
+      { 0x16, 0x0D, 0x1B, 0x06, 0x0D, 0x0B, 0x06, 0x0D }, // 1
+      { 0x16, 0x0C, 0x1A, 0x16, 0x0C, 0x1B, 0x16, 0x0D }, // 2
+      { 0x06, 0x0D, 0x0B, 0x06, 0x0D, 0x1B, 0x16, 0x0D }, // 3
+      { 0x16, 0x0D, 0x1B, 0x00, 0x00, 0x1B, 0x16, 0x0D }, // 4
+      { 0x16, 0x0D, 0x1B, 0x06, 0x0D, 0x1B, 0x16, 0x0D }, // 5
+      { 0x16, 0x0D, 0x1B, 0x16, 0x0C, 0x1B, 0x16, 0x0D }, // 6
+      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x1B, 0x16, 0x0D }, // 7
+    },
+    {
+      { 0,    1,    2,    3    },  // 0
+      { 0x20, 1,    0x20, 1    },  // 1  (CGRAM tile 1 = masked BR)
+      { 4,    5,    2,    7    },  // 2
+      { 4,    5,    7,    3    },  // 3
+      { 2,    3,    0x20, 3    },  // 4
+      { 6,    4,    7,    3    },  // 5
+      { 6,    4,    2,    3    },  // 6
+      { 0,    1,    0x20, 1    },  // 7  (CGRAM tile 1 = masked BR)
+      { 6,    5,    2,    3    },  // 8
+      { 6,    5,    7,    3    },  // 9
+    }
+  },
+  // Font 10: alien — diagonal strokes with dot accents (rune glyphs)
   {
     {
       { 0x1F, 0x03, 0x06, 0x0C, 0x0C, 0x18, 0x10, 0x10 }, // 0: Diag-Down-Left (/ 2px with top bar)
@@ -449,12 +499,14 @@ const char FN4[] PROGMEM = "curvy_h2v3";
 const char FN5[] PROGMEM = "curvy_h3v3";
 const char FN6[] PROGMEM = "curvy_h2v2";
 const char FN7[] PROGMEM = "curvy_h3v2";
-const char FN8[] PROGMEM = "alien";
-const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8 };
+const char FN8[] PROGMEM = "chess_B";
+const char FN9[] PROGMEM = "diag_B";
+const char FN10[] PROGMEM = "alien";
+const char* const FONT_NAMES[] PROGMEM = { FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8, FN9, FN10 };
 
 byte currentFont = 0;
 bool fantasyGroup = false;        // false = standard (0-7), true = fantasy
-byte fantasyIdx = 0;              // 0=alien, 1=checker, 2=vbars, 3=diag
+byte fantasyIdx = 0;              // 0=alien, 1=vbars
 
 // ── Column positions ─────────────────────────────────────────────────────────
 const int COL_H1    =  3;
@@ -564,7 +616,10 @@ volatile byte breathDuty = 0;  // 0..255, updated by updateBreathing()
 // Helper: read byte from current font's DIGITS matrix in PROGMEM
 // In any mask mode, digits 1 and 7 use tile 1 (flip(A)) instead of ROM 0x15
 // for the bottom-right cell, so the mask pattern applies uniformly.
+#define BLANK_DIGIT 10   // sentinel: suppress leading zero in hours
+
 inline byte dg(int d, int i) {
+  if (d == BLANK_DIGIT) return 0x20;
   byte v = pgm_read_byte(&FONTS[currentFont].digits[d][i]);
   if (maskMode != MASK_NONE && v == 0x15 && i == 3) v = 1;  // BR cell: CGRAM tile
   return v;
@@ -761,12 +816,13 @@ void drawWaiting() {
 void redrawAll() {
   int h2v = hh % 10, m1v = mm / 10, m2v = mm % 10;
   lcd.clear();
-  printBigDigit(hh/10, COL_H1 + colOffset + (h2v==1 ? 1 : 0));
+  int h1v = (hh >= 10) ? hh / 10 : BLANK_DIGIT;
+  printBigDigit(h1v, COL_H1 + colOffset + (h2v==1 ? 1 : 0));
   printBigDigit(h2v,   COL_H2 + colOffset);
   printBigDigit(m1v,   COL_M1 + colOffset - (m1v==1 ? 1 : 0));
   printBigDigit(m2v,   COL_M2 + colOffset - (m2v==1 ? 1 : 0) - (m1v==1 ? 1 : 0));
   drawColon();
-  last_h1 = hh / 10;  last_h2 = h2v;
+  last_h1 = h1v;  last_h2 = h2v;
   last_m1 = m1v;      last_m2 = m2v;
 }
 
@@ -873,7 +929,7 @@ void startClock(int h, int m, int sec = 0) {
 void adjustMinutes(int delta) {
   int total = ((hh * 60 + mm + delta) % 1440 + 1440) % 1440;
   hh = total / 60;  mm = total % 60;
-  animateDigits(hh / 10, hh % 10, mm / 10, mm % 10);
+  animateDigits((hh >= 10) ? hh / 10 : BLANK_DIGIT, hh % 10, mm / 10, mm % 10);
   updateOffset();
   syncRTC();
   colonCycle = 0;  colonPhase = 0;  lastColon = millis();
@@ -1460,13 +1516,11 @@ void nextInGroup() {
     byte next = (currentFont + 1) % STD_FONT_COUNT;
     switchToFont(next, true);
   } else {
-    // Fantasy: cycle alien → checker → vbars → diag → alien …  No curtain.
-    fantasyIdx = (fantasyIdx + 1) & 0x03;
+    // Fantasy: cycle alien → vbars → alien …  No curtain.
+    fantasyIdx = (fantasyIdx + 1) & 0x01;
     switch (fantasyIdx) {
       case 0: switchToFont(ALIEN_FONT_IDX, false); break;
-      case 1: activateMask(MASK_CHECKER);          break;
-      case 2: activateMask(MASK_VBARS);            break;
-      case 3: activateMask(MASK_DIAG);             break;
+      case 1: activateMask(MASK_VBARS);            break;
     }
   }
 }
@@ -1758,7 +1812,7 @@ void loop() {
         updateSunTimes();
         applyAutoBrightness();
         // First animate the digits
-        animateDigits(hh / 10, hh % 10, mm / 10, mm % 10);
+        animateDigits((hh >= 10) ? hh / 10 : BLANK_DIGIT, hh % 10, mm / 10, mm % 10);
         // Then shift the layout
         updateOffset();
       }
