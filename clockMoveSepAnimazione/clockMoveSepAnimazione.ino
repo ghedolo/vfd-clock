@@ -18,6 +18,9 @@
  * RTC DS3231 (ZS-042 module) via I2C:
  *   SDA → A4   SCL → A5   VCC → 5V   GND → GND
  *
+ * Presence sensor HLK-LD2410C (mmWave 24 GHz):
+ *   OT1 → A2   VCC → 5V   GND → GND
+ *
  * Serial commands (9600 baud): see setup() for full list.
  *
  * Copyright (C) 2026 ghedo (luca.ghedini@gmail.com)
@@ -552,6 +555,16 @@ bool battLow = false;
 unsigned long lastBattBlink = 0;
 bool battVisible = false;
 
+// Presence sensor (LD2410C mmWave): OT1 → A1
+#define PRESENCE_PIN        A2
+const unsigned long PRESENCE_TIMEOUT_MS = 5UL * 60UL * 1000UL;  // 5 min
+bool     presenceEnabled  = true;
+bool     presenceDimmed   = false;
+int      savedBrLevel     = 1;
+bool     lastPinState     = false;   // track raw pin for debug
+unsigned long lastPresDbg  = 0;      // periodic debug timer
+unsigned long lastPresenceMs = 0;
+
 // Piezo buzzer: D9 signal, D8 software GND
 #define BUZZ_PIN  9
 #define BUZZ_GND  8
@@ -853,6 +866,57 @@ void checkBatt() {
   }
 }
 
+void applyAutoBrightness(bool force = false);  // forward declaration
+
+// ── Presence sensor ─────────────────────────────────────────────────────────
+
+void updatePresence() {
+  bool detected = digitalRead(PRESENCE_PIN);
+  if (detected != lastPinState) {
+    lastPinState = detected;
+    Serial.print(F("Pres: "));
+    Serial.print(detected ? F("1") : F("0"));
+    if (rtcOk) {
+      DateTime utc = rtc.now();
+      int lh, lm;
+      utcToLocal(utc, lh, lm);
+      Serial.print(F(", "));
+      if (lh < 10) Serial.print('0'); Serial.print(lh);
+      Serial.print(':');
+      if (lm < 10) Serial.print('0'); Serial.print(lm);
+      Serial.print(':');
+      if (utc.second() < 10) Serial.print('0'); Serial.print(utc.second());
+    }
+    Serial.println();
+  }
+  if (!presenceEnabled) return;
+  unsigned long now = millis();
+
+  if (detected) {
+    lastPresenceMs = now;
+    if (presenceDimmed) {
+      presenceDimmed = false;
+      Serial.println(F("Presence: ON"));
+      int target = brManualOverride ? savedBrLevel : calcAutoBrightness();
+      for (int lvl = 1; lvl <= target; lvl++) {
+        setBrightness(lvl);
+        buzzWait(300);
+      }
+      if (!brManualOverride) {
+        autoBrLevel = target;
+      }
+    }
+  } else if (!presenceDimmed && (now - lastPresenceMs >= PRESENCE_TIMEOUT_MS)) {
+    Serial.println(F("Presence: OFF"));
+    savedBrLevel = curBrLevel;
+    for (int lvl = curBrLevel - 1; lvl >= 0; lvl--) {
+      setBrightness(lvl);
+      buzzWait(300);
+    }
+    presenceDimmed = true;
+  }
+}
+
 // ── Breathing LED (Timer2 ISR-driven PWM on pin 13) ─────────────────────────
 
 // Direct port manipulation for pin 13 (PB5) — ~50× faster than digitalWrite
@@ -986,7 +1050,7 @@ void applyAutoBrightness(bool force = false) {
   int newLevel = calcAutoBrightness();
   if (newLevel != autoBrLevel || force) {
     autoBrLevel = newLevel;
-    setBrightness(autoBrLevel);
+    if (!presenceDimmed) setBrightness(autoBrLevel);
   }
 }
 
@@ -1138,8 +1202,30 @@ void handleSerialChar(char c) {
   if (c == 't') { nextInGroup(); return; }
   if (c == 'T') { switchGroup();  return; }
   // Brightness: 0=off, 1=25%, 2=50%, 3=75%, 4=100%, 9=auto
-  if (c >= '0' && c <= '4') { brManualOverride = true; setBrightness(c - '0'); return; }
-  if (c == '9') { brManualOverride = false; applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
+  if (c >= '0' && c <= '4') { brManualOverride = true; presenceDimmed = false; lastPresenceMs = millis(); setBrightness(c - '0'); return; }
+  if (c == '9') { brManualOverride = false; presenceDimmed = false; lastPresenceMs = millis(); applyAutoBrightness(true); Serial.println(F("Auto-dimming")); return; }
+  // Presence sensor: f = force presence, F = toggle on/off
+  if (c == 'f') {
+    lastPresenceMs = millis();
+    if (presenceDimmed) {
+      presenceDimmed = false;
+      if (brManualOverride) setBrightness(curBrLevel);
+      else applyAutoBrightness(true);
+    }
+    Serial.println(F("Presence forced"));
+    return;
+  }
+  if (c == 'F') {
+    presenceEnabled = !presenceEnabled;
+    if (!presenceEnabled && presenceDimmed) {
+      presenceDimmed = false;
+      if (brManualOverride) setBrightness(curBrLevel);
+      else applyAutoBrightness(true);
+    }
+    Serial.print(F("Presence sensor: "));
+    Serial.println(presenceEnabled ? F("ON") : F("OFF"));
+    return;
+  }
   // Replay boot animation
   if (c == 'i') {
     brSilent = true;
@@ -1160,15 +1246,16 @@ void handleSerialChar(char c) {
     int mv = readBattMv();
     char fbuf[16];
     strcpy_P(fbuf, (char*)pgm_read_ptr(&FONT_NAMES[currentFont]));
-    char line[80];
+    char line[96];
     snprintf(line, sizeof(line),
-             "%04u-%02u-%02u %02u:%02u:%02u DST:%s BR:%d%% BATT:%d.%02dV FONT:%s",
+             "%04u-%02u-%02u %02u:%02u:%02u DST:%s BR:%d%% BATT:%d.%02dV FONT:%s PRES:%s",
              loc.year(), loc.month(), loc.day(),
              loc.hour(), loc.minute(), loc.second(),
              dst ? "YES" : "NO",
              curBrLevel * 25,
              mv / 1000, (mv % 1000) / 10,
-             fbuf);
+             fbuf,
+             !presenceEnabled ? "OFF" : (digitalRead(PRESENCE_PIN) ? "YES" : "NO"));
     Serial.println(line);
     return;
   }
@@ -1552,6 +1639,10 @@ void setup() {
   digitalWrite(BTN_GND, LOW);
   pinMode(BTN_PIN, INPUT_PULLUP);
 
+  // Presence sensor: LD2410C OT1 on A2
+  pinMode(PRESENCE_PIN, INPUT);
+  lastPresenceMs = millis();
+
   lcd.begin(20, 2);
   setBrightness(1);  // 25% at startup
 
@@ -1578,6 +1669,8 @@ void setup() {
   Serial.println(F("  i                  Replay boot animation"));
   Serial.println(F("  t                  Next font in group (single button press)"));
   Serial.println(F("  T                  Switch font group  (double button press)"));
+  Serial.println(F("  f                  Force presence (test)"));
+  Serial.println(F("  F                  Toggle presence sensor on/off"));
   Serial.println(F("  r                  Software reset"));
   Serial.println();
 
@@ -1660,6 +1753,7 @@ void loop() {
   }
 
   updateBreathing();  // breathing LED always active
+  updatePresence();
 
   // Button on D7: single = cycle in group, double = switch group
   if (digitalRead(BTN_PIN) == LOW) {

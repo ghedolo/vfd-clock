@@ -16,6 +16,7 @@ Big-font HH:MM clock on a **Futaba M202SD16 VFD** (20x2, HD44780 compatible) dri
 - **Breathing LED** — cosine-ramp PWM on D13
 - **Piezo buzzer** — soft click on each minute change (Timer1 hardware tone)
 - **CR2032 battery monitoring** — low-voltage warning with blinking indicator on display
+- **Presence detection** — HLK-LD2410C mmWave sensor turns display off after 5 minutes of no presence (fade-down) and back on with fade-up when someone returns; preserves VFD phosphor
 - **Serial interface** — full control over time, brightness, GPS position, and more
 
 ## Fonts
@@ -95,6 +96,8 @@ Preview (edgy_h2v3, default):
 | Button | D7 (INPUT_PULLUP) |
 | Button GND | D6 (software ground) |
 | CR2032 (+) | A3 (via 100k ohm) |
+| LD2410C OT1 | A2 |
+| LD2410C VCC / GND | +5V / GND (separate supply, common GND) |
 
 Full wiring details: [wiring.pdf](wiring.pdf)
 
@@ -110,9 +113,12 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 | `9` | Auto-dimming (sunrise/sunset) |
 | `p:lat,lon` | Set GPS position (e.g. `p:41.9028,12.4964`) |
 | `v` | CR2032 battery voltage |
+| `o` | Overall status (time, DST, brightness, battery, font, presence) |
 | `i` | Replay boot animation |
 | `t` | Next font in current group (single button press) |
 | `T` | Switch font group (double button press) |
+| `f` | Force presence (test) |
+| `F` | Toggle presence sensor on/off |
 | `r` | Software reset |
 
 ## Hardware
@@ -121,6 +127,7 @@ Full wiring details: [wiring.pdf](wiring.pdf)
 - **MCU:** Arduino Nano (ATmega328P)
 - **RTC:** DS3231 on ZS-042 module (I2C)
 - **Battery:** CR2032 coin cell for RTC backup
+- **Presence sensor:** HLK-LD2410C (mmWave 24 GHz, static + motion detection)
 
 ### ZS-042 module modification
 
