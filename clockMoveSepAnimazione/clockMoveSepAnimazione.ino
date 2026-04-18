@@ -1255,7 +1255,7 @@ void handleSerialChar(char c) {
              curBrLevel * 25,
              mv / 1000, (mv % 1000) / 10,
              fbuf,
-             !presenceEnabled ? "OFF" : (digitalRead(PRESENCE_PIN) ? "YES" : "NO"));
+             !presenceEnabled ? "OFF" : (digitalRead(PRESENCE_PIN) ? "active" : "NO"));
     Serial.println(line);
     return;
   }
@@ -1839,9 +1839,16 @@ void loop() {
             utcToLocal(utcNow, lh, lm);
             int ds = (int)utcNow.second();
             if (ds > 30) ds -= 60;
-            Serial.print(F("delta: "));
-            Serial.print(ds);
-            Serial.println(F(" s"));
+            if (abs(ds) > 7) {
+              Serial.print(F("Delta: "));
+              Serial.print(ds);
+              Serial.print(F(", "));
+              if (lh < 10) Serial.print('0'); Serial.print(lh);
+              Serial.print(':');
+              if (lm < 10) Serial.print('0'); Serial.print(lm);
+              Serial.print(':');
+              if (utcNow.second() < 10) Serial.print('0'); Serial.println(utcNow.second());
+            }
             if (ds > 0) {
               unsigned long back = min((unsigned long)ds * 1000UL, 2000UL);
               lastMaskFlip -= back;
@@ -1883,9 +1890,16 @@ void loop() {
           // (DS3231 crystal). ds > 0 = animation late, ds < 0 = early.
           int ds = (int)utcNow.second();
           if (ds > 30) ds -= 60;
-          Serial.print(F("delta: "));
-          Serial.print(ds);
-          Serial.println(F(" s"));
+          if (abs(ds) > 7) {
+            Serial.print(F("Delta: "));
+            Serial.print(ds);
+            Serial.print(F(", "));
+            if (lh < 10) Serial.print('0'); Serial.print(lh);
+            Serial.print(':');
+            if (lm < 10) Serial.print('0'); Serial.print(lm);
+            Serial.print(':');
+            if (utcNow.second() < 10) Serial.print('0'); Serial.println(utcNow.second());
+          }
           // Hard-reset lastColon to current time. This kills any
           // accumulated debt that would cause a frame burst cascade.
           lastColon = millis();
